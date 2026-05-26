@@ -50,11 +50,11 @@ describe("resources registry", () => {
         }
     });
 
-    it("returns entries in group-then-alphabetical display order", () => {
+    it("returns entries in group-then-(Pods-pinned/alphabetical) display order", () => {
         const orderedKinds = RESOURCES.map((r) => r.kind);
         expect(orderedKinds).toEqual([
-            "deployment",
             "pod",
+            "deployment",
             "replicaset",
             "configmap",
             "secret",

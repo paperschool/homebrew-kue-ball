@@ -21,7 +21,7 @@ so that menu navigation, verb dispatch, and future-resource additions all read f
    - `specificVerbs` is an array of strings (free-form for now — story 6-2/6-3 will define the canonical set)
 3. **Given** the registry, **Then** it includes entries for **Pods, Deployments, ReplicaSets, Services, ConfigMaps, Secrets, Ingress, ServiceAccounts** — every resource that has a current `src/commands/*.js` module today.
 4. **Given** `getResource("pod")`, **Then** it returns the Pods entry; `getResource("nonexistent")` returns `null` (not `undefined` — choose explicitly).
-5. **Given** `getResources()`, **Then** it returns the `RESOURCES` array in display order (the order they should appear in the menu — group order: Workloads → Config → Networking → Cluster → Storage; alphabetical inside each group).
+5. **Given** `getResources()`, **Then** it returns the `RESOURCES` array in display order (the order they should appear in the menu — group order: Workloads → Config → Networking → Cluster → Storage; within Workloads `Pods` is pinned first and the remainder are alphabetical; every other group is strictly alphabetical).
 6. **Given** the registry, **Then** no two entries share the same `kind` (enforced by a startup-time validation or by the test).
 7. **Given** `resources.test.js`, **Then** it asserts: every entry has all required fields with the correct types; `getResource("pod")` returns the Pods entry; `getResource("nonexistent")` returns `null`; `getResources()` returns entries in the expected display order; no two entries share the same `kind`.
 
@@ -56,7 +56,7 @@ so that menu navigation, verb dispatch, and future-resource additions all read f
   - [x] Test required-field presence by iterating `RESOURCES` and asserting `typeof` for each field.
   - [x] Test `getResource("pod")` returns object with `displayName: "Pods"`.
   - [x] Test `getResource("nonexistent")` returns `null` (strict equality).
-  - [x] Test ordering: assert all `group` values are one of the five allowed. — *Ordering test asserts the actual alphabetical order per AC #5 (Deployments, Pods, ReplicaSets…) rather than the "Pods, Deployments, ReplicaSets" example in this task description; see Completion Notes.*
+  - [x] Test ordering: assert all `group` values are one of the five allowed. — *Ordering test asserts Pods-pinned-first then alphabetical within Workloads (Pods, Deployments, ReplicaSets); all other groups strictly alphabetical. See AC #5 (updated post-v1.4.0) and Completion Notes.*
   - [x] Test uniqueness: assert `new Set(RESOURCES.map(r => r.kind)).size === RESOURCES.length`.
 
 - [x] **Task 5: Verify no regressions and integrate** (AC: all)
@@ -89,16 +89,16 @@ so that menu navigation, verb dispatch, and future-resource additions all read f
 The order matters because story 6-5 will build the resource picker by iterating `getResources()` and rendering `Separator` headers when `group` changes. Stable grouping requires entries pre-sorted by group. Within a group, alphabetical-by-displayName keeps the order predictable as new resources are added (story 6-7 and 6-8).
 
 Final order for this story's eight entries:
-1. Pods (Workloads)
-2. Deployments (Workloads)
+1. Pods (Workloads — pinned first)
+2. Deployments (Workloads — alphabetical of the rest)
 3. ReplicaSets (Workloads)
-4. ConfigMaps (Config)
+4. ConfigMaps (Config — alphabetical)
 5. Secrets (Config)
-6. Ingress (Networking)
+6. Ingress (Networking — alphabetical)
 7. ServiceAccounts (Networking)
 8. Services (Networking)
 
-*(Alphabetical within group: Deployments < Pods < ReplicaSets is alphabetical; D < P < R. Final order above is sorted alphabetically inside each group — verify when writing the test.)*
+*(Pods is pinned first within Workloads — it's the most-used resource for an interactive CLI. The rest follows strict alphabetical order so new resources slot in predictably.)*
 
 ### What NOT to do (anti-patterns from past stories)
 
@@ -158,7 +158,7 @@ None — TDD red→green→refactor flow completed without diversions.
 
 ### Completion Notes List
 
-- **Internal story contradiction resolved in favour of AC #5.** The story Task 4 description suggested the first three entries should be `Pods, Deployments, ReplicaSets`, but AC #5 specifies "alphabetical inside each group." For Workloads, strict alphabetical is `Deployments, Pods, ReplicaSets` (D<P<R). The AC is authoritative, so the implementation and ordering test both follow alphabetical order. Recommend the create-story author update Task 4's example to match AC #5 on the next iteration.
+- **Story-spec contradiction resolved by a follow-up UX decision (v1.4.1).** Original AC #5 said "alphabetical inside each group" but Task 4 said "first three are Pods, Deployments, ReplicaSets". I first shipped strict alphabetical (Deployments, Pods, ReplicaSets) under v1.4.0, then surfaced the contradiction in the post-implementation check. The product decision: pin Pods first within Workloads (most-used resource for an interactive CLI), alphabetical for the rest of Workloads and for all other groups. AC #5 wording and the ordering test were updated, registry reordered. Other groups remain strictly alphabetical.
 - **Uniqueness check implemented as a module-load-time throw.** A loop after the `RESOURCES` declaration asserts uniqueness and throws `Error("Duplicate resource kind in registry: ...")` on a duplicate. The test covers the invariant via `new Set(kinds).size === kinds.length` rather than dynamically loading a broken module — keeps the test simple while still gating bad merges at import time.
 - **`getResource(null)` and `getResource("")` return `null`** (added defensively beyond the strict AC). The AC only specifies the `"nonexistent"` case; falsy inputs fall through cleanly so callers don't need to pre-guard.
 - **`getResources()` returns the live `RESOURCES` reference, not a copy.** A `// why:` comment marks it as read-only by contract. Copying on each call would cost ~150 bytes/invocation for no callers that mutate; the project context says don't optimize for hypotheticals.
@@ -175,4 +175,5 @@ None — TDD red→green→refactor flow completed without diversions.
 
 ### Change Log
 
-- 2026-05-26 — Initial implementation: registry array, `getResource`, `getResources`, uniqueness invariant, 14 vitest cases. Status → review.
+- 2026-05-26 — Initial implementation (v1.4.0): registry array (alphabetical-within-group), `getResource`, `getResources`, uniqueness invariant, 14 vitest cases. Status → review.
+- 2026-05-26 — UX correction (v1.4.1): Pinned Pods first within Workloads per product decision. Updated AC #5, ordering test, and registry order. Other groups still strictly alphabetical.

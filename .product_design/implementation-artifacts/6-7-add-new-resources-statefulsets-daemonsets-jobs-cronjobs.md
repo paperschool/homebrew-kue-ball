@@ -42,9 +42,9 @@ so that I can manage stateful workloads, daemons, and batch jobs without droppin
 ## Tasks / Subtasks
 
 - [ ] **Task 1: Add four entries to `resources.js`** (AC: #1)
-  - [ ] Add entries in the Workloads group block, preserving alphabetical order: CronJobs, DaemonSets, Deployments (existing), Jobs, Pods (existing), ReplicaSets (existing), StatefulSets.
-  - [ ] Wait — alphabetical with existing entries would shuffle existing order. **Decision:** keep existing entries in their current positions, append new entries to the bottom of the Workloads block alphabetically among themselves (CronJobs, DaemonSets, Jobs, StatefulSets). Net order: Pods, Deployments, ReplicaSets, CronJobs, DaemonSets, Jobs, StatefulSets.
-  - [ ] Adjust the resources.test.js ordering assertion accordingly.
+  - [ ] Workloads ordering rule (per v1.4.1 of story 6-1): **Pods is pinned first; everything else in Workloads is strictly alphabetical.** So after this story, the Workloads block reads: `Pods, CronJobs, DaemonSets, Deployments, Jobs, ReplicaSets, StatefulSets`.
+  - [ ] Reorder existing Deployments and ReplicaSets to fit the new alphabetical layout (they currently sit at index 1 and 2; after this story they should sit alphabetically among the new arrivals).
+  - [ ] Update `src/lib/resources.test.js` "returns entries in display order" assertion to reflect the new full ordering.
 
 - [ ] **Task 2: Extend `logs` handler for Jobs** (AC: #2, #4)
   - [ ] In `src/lib/specificVerbs.js`, modify `logs.handler` to branch on `resource.kind`:

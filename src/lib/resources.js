@@ -9,10 +9,13 @@
  * @property {string[]} specificVerbs   names from src/lib/specificVerbs.js
  */
 
+// Within each group, entries are alphabetical EXCEPT in Workloads where Pods is pinned first
+// (most-used resource for an interactive CLI; everything else in Workloads is alphabetical).
+
 /** @type {Resource[]} */
 export const RESOURCES = [
-    { kind: "deployment",     plural: "deployments",     displayName: "Deployments",     group: "Workloads",  namespaced: true, universalVerbs: ["list", "describe", "edit", "delete"], specificVerbs: [] },
     { kind: "pod",            plural: "pods",            displayName: "Pods",            group: "Workloads",  namespaced: true, universalVerbs: ["list", "describe", "edit", "delete"], specificVerbs: [] },
+    { kind: "deployment",     plural: "deployments",     displayName: "Deployments",     group: "Workloads",  namespaced: true, universalVerbs: ["list", "describe", "edit", "delete"], specificVerbs: [] },
     { kind: "replicaset",     plural: "replicasets",     displayName: "ReplicaSets",     group: "Workloads",  namespaced: true, universalVerbs: ["list", "describe", "edit", "delete"], specificVerbs: [] },
 
     { kind: "configmap",      plural: "configmaps",      displayName: "ConfigMaps",      group: "Config",     namespaced: true, universalVerbs: ["list", "describe", "edit", "delete"], specificVerbs: [] },

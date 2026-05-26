@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.4.1 — 2026-05-26
+
+- Pinned Pods first within the Workloads group of the resource registry (most-used kubectl resource); everything else stays alphabetical. Updated story 6-1's AC #5, the ordering test, and story 6-7's Workloads ordering rule to match.
+
 ## v1.4.0 — 2026-05-26
 
 - Added `src/lib/resources.js` — the resource registry that will back the upcoming two-level (resource → verb) menu. Ships with the 8 resources currently covered by `src/commands/*` (Pods, Deployments, ReplicaSets, ConfigMaps, Secrets, Ingress, ServiceAccounts, Services), each with kind/plural/displayName/group/namespaced and universal/specific verb arrays.

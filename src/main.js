@@ -11,9 +11,12 @@ import { buildContextsCommands } from "./commands/contexts.js";
 import { buildExecCommands } from "./commands/exec.js";
 import { buildHelmCommands } from "./commands/helm.js";
 import { buildPingCommands } from "./commands/ping.js";
+import { getResources } from "./lib/resources.js";
+import { UNIVERSAL_VERBS } from "./lib/universalVerbs.js";
+import { SPECIFIC_VERBS } from "./lib/specificVerbs.js";
 import { isKubectlAvailable, getKubectlVersion, getCurrentContext, getContexts, getNamespaces, useContext } from "./lib/kubectl.js";
 import { isHelmAvailable, getHelmVersion } from "./lib/helm.js";
-import { ok, warn, CYAN, YELLOW, DIM, RESET, BOLD, RED, styleDeleteCommandLabel } from "./lib/output.js";
+import { ok, warn, CYAN, YELLOW, DIM, RESET, RED, styleDeleteCommandLabel } from "./lib/output.js";
 import { APP_NAME, DEFAULT_NAMESPACE, DEFAULT_CONTEXT } from "./lib/env.js";
 import { refreshContexts, isPermissionError, showPimReminder, subscriptionForContext, isAzCliAvailable, getAzVersion } from "./lib/azure.js";
 import { RETURN_TO_MENU } from "./lib/runner.js";
@@ -37,6 +40,44 @@ export function buildAllCommands(ctx, ns) {
         ...buildHelmCommands(ctx, ns),
         ...buildPingCommands(ctx, ns),
     ];
+}
+
+export function buildResourceMenu() {
+    const resourceItems = getResources().map((r) => ({
+        group: r.group,
+        name: r.displayName,
+        value: { type: "resource", resource: r },
+    }));
+    const extras = [
+        { name: "Helm",     value: { type: "extra", id: "helm" } },
+        { name: "Ping",     value: { type: "extra", id: "ping" } },
+        { name: "Contexts", value: { type: "extra", id: "contexts" } },
+        { name: "Exit",     value: { type: "extra", id: "exit" } },
+    ];
+    return [...resourceItems, ...extras];
+}
+
+export function buildVerbMenu(resource) {
+    const items = [];
+    for (const verb of [...resource.universalVerbs, ...resource.specificVerbs]) {
+        const entry = UNIVERSAL_VERBS[verb] ?? SPECIFIC_VERBS[verb];
+        if (!entry) {
+            warn(`Verb "${verb}" not found in registries — check resources.js.`);
+            continue;
+        }
+        items.push({
+            name: entry.displayName,
+            value: { verb, handler: entry.handler },
+        });
+    }
+    items.push({ name: "← Back to resources", value: { back: true } });
+    return items;
+}
+
+export async function dispatchVerb(verbName, resource, ctx, ns) {
+    const entry = UNIVERSAL_VERBS[verbName] ?? SPECIFIC_VERBS[verbName];
+    if (!entry) return null;
+    return entry.handler(resource, ctx, ns);
 }
 
 async function pickContext() {
@@ -93,8 +134,6 @@ async function pickNamespace(ctx) {
     });
 }
 
-// Verifies the required (kubectl) and optional (helm, az) CLIs up front. kubectl is fatal;
-// helm/az just warn. Returns whether az is available so the caller can gate the Azure refresh.
 function checkPrerequisites() {
     const probe = (label, available, getVersion) => {
         process.stdout.write(`  ${DIM}Checking for ${label}…${RESET}`);
@@ -124,6 +163,56 @@ function checkPrerequisites() {
     return { azAvailable: az.found };
 }
 
+// Runs a legacy `build*Commands(ctx, ns)`-style sub-picker (Helm / Ping / Contexts) and dispatches the chosen command.
+// Returns whatever the command's run() resolves to so the caller can forward sentinels (RETURN_TO_MENU, change-namespace).
+async function runLegacySubmenu(label, builder, ctx, ns) {
+    step(label, "Pick an operation to run.");
+    const commands = builder(ctx, ns);
+    if (commands.length === 0) {
+        warn(`No ${label.toLowerCase()} commands available.`);
+        return null;
+    }
+    const items = [
+        ...commands.map((cmd) => ({ name: styleDeleteCommandLabel(cmd.name), value: cmd, group: cmd.group })),
+        { name: "← Back", value: { back: true } },
+    ];
+    const picked = await searchableList({ message: `${label} action:`, items });
+    if (!picked || picked.back) return null;
+    setLastCommand(picked.name);
+    return picked.run();
+}
+
+async function handleSentinel(result, context, currentNamespace) {
+    if (result === "change-context") {
+        const ctxList = getContexts();
+        if (ctxList.length === 0) { warn("No contexts found."); return { context, currentNamespace }; }
+        const newCtx = await searchableList({
+            message: "Switch to context:",
+            items: ctxList.map((c) => ({ name: c === context ? `${c}  ${DIM}(current)${RESET}` : c, value: c })),
+        });
+        if (newCtx && newCtx !== context) {
+            useContext(newCtx);
+            const newNs = await pickNamespace(newCtx);
+            setContextInfo(newCtx, newNs);
+            setSubscription(subscriptionForContext(newCtx));
+            ok(`Switched to context: ${CYAN}${newCtx}${RESET}`);
+            return { context: newCtx, currentNamespace: newNs };
+        }
+        return { context, currentNamespace };
+    }
+    if (result === "change-namespace") {
+        process.stdout.write(`  ${DIM}Fetching namespaces…${RESET}`);
+        const allNs = getNamespaces(context);
+        process.stdout.write("\r\x1b[2K");
+        if (allNs.length === 0) { warn("Could not list namespaces."); return { context, currentNamespace }; }
+        const newNs = await searchableList({ message: "Select namespace:", items: allNs.map((n) => ({ name: n, value: n })) });
+        ok(`Switched to namespace: ${YELLOW}${newNs}${RESET}`);
+        setContextInfo(context, newNs);
+        return { context, currentNamespace: newNs };
+    }
+    return { context, currentNamespace };
+}
+
 async function main() {
     initChrome();
     await loadIdentity();
@@ -140,69 +229,48 @@ async function main() {
     }
     let context = await pickContext();
     if (!context) return;
-    const namespace = await pickNamespace(context);
-    setContextInfo(context, namespace);
+    let currentNamespace = await pickNamespace(context);
+    setContextInfo(context, currentNamespace);
     setSubscription(subscriptionForContext(context));
-    hideSplash(); // entering the menu — the title art should no longer redraw on resize
-    let currentNamespace = namespace;
+    hideSplash();
+
     while (true) {
-        console.log("");
-        const pageSize = Math.max(5, (process.stdout.rows ?? 24) - 4);
-        const commands = buildAllCommands(context, currentNamespace);
-        const chosen = await searchableList({
-            message: "Run a command:",
-            items: [
-                ...commands.map((cmd) => ({ name: `  ${styleDeleteCommandLabel(cmd.name)}`, value: cmd, group: cmd.group })),
-                { name: "  Exit wizard", value: "exit" },
-            ],
-            pageSize,
-        });
-        if (chosen === "exit" || chosen === null) break;
-        console.log("");
-        setLastCommand(chosen.name);
-        try {
-            const result = await chosen.run();
-            if (result === "change-context") {
-                const ctxList = getContexts();
-                if (ctxList.length === 0) { warn("No contexts found."); }
-                else {
-                    const newCtx = await searchableList({
-                        message: "Switch to context:",
-                        items: ctxList.map((c) => ({ name: c === context ? `${c}  ${DIM}(current)${RESET}` : c, value: c })),
-                    });
-                    if (newCtx && newCtx !== context) {
-                        context = newCtx;
-                        useContext(context);
-                        currentNamespace = await pickNamespace(context);
-                        setContextInfo(context, currentNamespace);
-                        setSubscription(subscriptionForContext(context));
-                        ok(`Switched to context: ${CYAN}${context}${RESET}`);
-                    }
-                }
-                console.log("");
+        step("Choose resource", "Pick a kubernetes resource type to act on.");
+        const top = await searchableList({ message: "Resource or action:", items: buildResourceMenu() });
+        if (!top || (top.type === "extra" && top.id === "exit")) break;
+
+        if (top.type === "extra") {
+            let extraResult = null;
+            try {
+                if (top.id === "helm")     extraResult = await runLegacySubmenu("Helm",     buildHelmCommands,     context, currentNamespace);
+                if (top.id === "ping")     extraResult = await runLegacySubmenu("Ping",     buildPingCommands,     context, currentNamespace);
+                if (top.id === "contexts") extraResult = await runLegacySubmenu("Contexts", buildContextsCommands, context, currentNamespace);
+            } catch (err) {
+                console.error(`\n  ${RED}✗ ${err.message}${RESET}`);
+                if (isPermissionError(err.message)) showPimReminder();
                 continue;
             }
-            if (result === "change-namespace") {
-                process.stdout.write(`  ${DIM}Fetching namespaces…${RESET}`);
-                const allNs = getNamespaces(context);
-                process.stdout.write("\r\x1b[2K");
-                if (allNs.length === 0) { warn("Could not list namespaces."); }
-                else {
-                    currentNamespace = await searchableList({ message: "Select namespace:", items: allNs.map((n) => ({ name: n, value: n })) });
-                    ok(`Switched to namespace: ${YELLOW}${currentNamespace}${RESET}`);
-                    setContextInfo(context, currentNamespace);
-                }
-                console.log("");
-                continue;
-            }
-            if (result === RETURN_TO_MENU) { console.log(""); continue; }
-        } catch (err) {
-            console.error(`\n  ${RED}✗ ${err.message}${RESET}`);
-            if (isPermissionError(err.message)) showPimReminder();
+            ({ context, currentNamespace } = await handleSentinel(extraResult, context, currentNamespace));
+            continue;
         }
-        console.log("");
-        const again = await confirm({ message: "Run another command?", default: true });
-        if (!again) break;
+
+        // Resource selected — enter the verb loop.
+        const resource = top.resource;
+        let stayOnResource = true;
+        while (stayOnResource) {
+            step(`${resource.displayName} — choose action`, "Pick an operation to run.");
+            const picked = await searchableList({ message: "Action:", items: buildVerbMenu(resource) });
+            if (!picked || picked.back) { stayOnResource = false; break; }
+            setLastCommand(`${resource.displayName}: ${picked.verb}`);
+            try {
+                const result = await dispatchVerb(picked.verb, resource, context, currentNamespace);
+                if (result === RETURN_TO_MENU) continue;
+                ({ context, currentNamespace } = await handleSentinel(result, context, currentNamespace));
+            } catch (err) {
+                console.error(`\n  ${RED}✗ ${err.message}${RESET}`);
+                if (isPermissionError(err.message)) showPimReminder();
+            }
+        }
     }
     console.log(`\n  ${DIM}Goodbye!${RESET}\n`);
 }

@@ -11,11 +11,12 @@ vi.mock("./commands/resources.js", () => ({ buildResourcesCommands: vi.fn().mock
 vi.mock("./commands/contexts.js", () => ({ buildContextsCommands: vi.fn().mockReturnValue([]) }));
 vi.mock("./commands/exec.js", () => ({ buildExecCommands: vi.fn().mockReturnValue([]) }));
 vi.mock("./commands/helm.js", () => ({ buildHelmCommands: vi.fn().mockReturnValue([]) }));
+vi.mock("./commands/ping.js", () => ({ buildPingCommands: vi.fn().mockReturnValue([]) }));
+
 vi.mock("./lib/helm.js", () => ({
     isHelmAvailable: vi.fn().mockReturnValue(true),
     getHelmVersion: vi.fn().mockReturnValue("v3.14.0"),
 }));
-vi.mock("./commands/ping.js", () => ({ buildPingCommands: vi.fn().mockReturnValue([]) }));
 
 vi.mock("./lib/kubectl.js", () => ({
     isKubectlAvailable: vi.fn().mockReturnValue(true),
@@ -57,7 +58,7 @@ vi.mock("./lib/env.js", () => ({
 vi.mock("./lib/runner.js", () => ({ RETURN_TO_MENU: "return-to-menu" }));
 
 vi.mock("./ui/searchableList.js", () => ({
-    searchableList: vi.fn().mockResolvedValue("exit"),
+    searchableList: vi.fn(),
 }));
 
 vi.mock("./ui/chrome.js", () => ({
@@ -89,79 +90,142 @@ vi.mock("@inquirer/prompts", () => ({
     input: vi.fn().mockResolvedValue("default"),
 }));
 
-import { buildAllCommands } from "./main.js";
-import { buildPodsCommands } from "./commands/pods.js";
-import { buildLogsCommands } from "./commands/logs.js";
-import { buildDeploymentsCommands } from "./commands/deployments.js";
-import { buildReplicaSetsCommands } from "./commands/replicasets.js";
-import { buildServicesCommands } from "./commands/services.js";
-import { buildConfigCommands } from "./commands/config.js";
-import { buildEventsCommands } from "./commands/events.js";
-import { buildResourcesCommands } from "./commands/resources.js";
-import { buildContextsCommands } from "./commands/contexts.js";
-import { buildExecCommands } from "./commands/exec.js";
-import { buildHelmCommands } from "./commands/helm.js";
-import { buildPingCommands } from "./commands/ping.js";
+const { podsResource, deploymentsResource, handlers } = vi.hoisted(() => {
+    const podsResource = {
+        kind: "pod", plural: "pods", displayName: "Pods", group: "Workloads",
+        namespaced: true, universalVerbs: ["list", "describe", "delete"], specificVerbs: ["logs", "exec"],
+    };
+    const deploymentsResource = {
+        kind: "deployment", plural: "deployments", displayName: "Deployments", group: "Workloads",
+        namespaced: true, universalVerbs: ["list", "describe", "edit", "delete"], specificVerbs: ["scale"],
+    };
+    return {
+        podsResource,
+        deploymentsResource,
+        handlers: {
+            list:     vi.fn().mockResolvedValue(undefined),
+            describe: vi.fn().mockResolvedValue(undefined),
+            edit:     vi.fn().mockResolvedValue(undefined),
+            delete:   vi.fn().mockResolvedValue(undefined),
+            logs:     vi.fn().mockResolvedValue(undefined),
+            exec:     vi.fn().mockResolvedValue(undefined),
+            scale:    vi.fn().mockResolvedValue(undefined),
+        },
+    };
+});
 
-const ALL_BUILDERS = [
-    buildPodsCommands,
-    buildLogsCommands,
-    buildDeploymentsCommands,
-    buildReplicaSetsCommands,
-    buildServicesCommands,
-    buildConfigCommands,
-    buildEventsCommands,
-    buildResourcesCommands,
-    buildContextsCommands,
-    buildExecCommands,
-    buildHelmCommands,
-    buildPingCommands,
-];
+vi.mock("./lib/resources.js", () => ({
+    getResources: vi.fn().mockReturnValue([podsResource, deploymentsResource]),
+}));
+
+vi.mock("./lib/universalVerbs.js", () => ({
+    UNIVERSAL_VERBS: {
+        list:     { displayName: "List",     handler: handlers.list },
+        describe: { displayName: "Describe", handler: handlers.describe },
+        edit:     { displayName: "Edit",     handler: handlers.edit },
+        delete:   { displayName: "Delete",   handler: handlers.delete },
+    },
+}));
+
+vi.mock("./lib/specificVerbs.js", () => ({
+    SPECIFIC_VERBS: {
+        logs:  { displayName: "Stream logs",    handler: handlers.logs },
+        exec:  { displayName: "Shell into pod", handler: handlers.exec },
+        scale: { displayName: "Scale",          handler: handlers.scale },
+    },
+}));
+
+const listHandler = handlers.list;
+const scaleHandler = handlers.scale;
+
+import { buildAllCommands, buildResourceMenu, buildVerbMenu, dispatchVerb } from "./main.js";
+import { buildPodsCommands } from "./commands/pods.js";
+import { buildPingCommands } from "./commands/ping.js";
 
 const CTX = "test-ctx";
 const NS = "test-ns";
 
 beforeEach(() => {
     vi.clearAllMocks();
-    ALL_BUILDERS.forEach((fn) => fn.mockReturnValue([]));
 });
 
-describe("buildAllCommands", () => {
-    it("calls all 12 builders with the provided ctx and ns", () => {
-        buildAllCommands(CTX, NS);
-        for (const fn of ALL_BUILDERS) {
-            expect(fn).toHaveBeenCalledWith(CTX, NS);
-        }
-    });
-
-    it("calls each builder exactly once per invocation", () => {
-        buildAllCommands(CTX, NS);
-        for (const fn of ALL_BUILDERS) {
-            expect(fn).toHaveBeenCalledOnce();
-        }
-    });
-
-    it("returns a flat array with no nested sub-arrays", () => {
+describe("buildAllCommands (legacy — unused by main loop after 6-5; still exported until 6-6)", () => {
+    it("returns a flat array concatenating all 12 builder results", () => {
         buildPodsCommands.mockReturnValue([{ group: "Pods", name: "a", run: vi.fn() }]);
-        buildLogsCommands.mockReturnValue([{ group: "Logs", name: "b", run: vi.fn() }]);
+        buildPingCommands.mockReturnValue([{ group: "Ping", name: "b", run: vi.fn() }]);
         const result = buildAllCommands(CTX, NS);
         expect(Array.isArray(result)).toBe(true);
-        expect(result.every((item) => !Array.isArray(item))).toBe(true);
+        expect(result[0].name).toBe("a");
+        expect(result[result.length - 1].name).toBe("b");
+    });
+});
+
+describe("buildResourceMenu", () => {
+    it("returns items for every registered resource plus the four extras", () => {
+        const items = buildResourceMenu();
+        const resources = items.filter((i) => i.value?.type === "resource");
+        const extras = items.filter((i) => i.value?.type === "extra");
+        expect(resources).toHaveLength(2);
+        expect(extras.map((e) => e.value.id)).toEqual(["helm", "ping", "contexts", "exit"]);
     });
 
-    it("returns Pods commands first and Ping commands last", () => {
-        const podsCmd = { group: "Pods", name: "List pods", run: vi.fn() };
-        const pingCmd = { group: "Ping", name: "Ping routes", run: vi.fn() };
-        buildPodsCommands.mockReturnValue([podsCmd]);
-        buildPingCommands.mockReturnValue([pingCmd]);
-        const result = buildAllCommands(CTX, NS);
-        expect(result[0]).toBe(podsCmd);
-        expect(result[result.length - 1]).toBe(pingCmd);
+    it("resource items carry the resource entry on value.resource and use the displayName as the visible name", () => {
+        const items = buildResourceMenu();
+        const podsItem = items.find((i) => i.name === "Pods");
+        expect(podsItem.value).toEqual({ type: "resource", resource: podsResource });
     });
 
-    it("concatenates all builder results into a single array", () => {
-        ALL_BUILDERS.forEach((fn) => fn.mockReturnValue([{ group: "X", name: "cmd", run: vi.fn() }]));
-        const result = buildAllCommands(CTX, NS);
-        expect(result).toHaveLength(ALL_BUILDERS.length);
+    it("resource items carry a group; extras have no group (so they render flat below the grouped resources)", () => {
+        const items = buildResourceMenu();
+        const resources = items.filter((i) => i.value?.type === "resource");
+        const extras = items.filter((i) => i.value?.type === "extra");
+        for (const r of resources) expect(typeof r.group).toBe("string");
+        for (const e of extras) expect(e.group).toBeUndefined();
+    });
+});
+
+describe("buildVerbMenu(resource)", () => {
+    it("returns one item per universal + specific verb in declaration order, plus a trailing back item", () => {
+        const items = buildVerbMenu(podsResource);
+        expect(items).toHaveLength(podsResource.universalVerbs.length + podsResource.specificVerbs.length + 1);
+        expect(items[items.length - 1].value).toEqual({ back: true });
+        expect(items[items.length - 1].name).toContain("Back");
+    });
+
+    it("looks up displayName via UNIVERSAL_VERBS / SPECIFIC_VERBS", () => {
+        const items = buildVerbMenu(podsResource);
+        expect(items[0].name).toBe("List");           // universal
+        expect(items.find((i) => i.value?.verb === "logs").name).toBe("Stream logs"); // specific
+    });
+
+    it("skips unknown verb names with a warn instead of crashing", () => {
+        const broken = { ...podsResource, universalVerbs: ["list", "garbageVerb"] };
+        const items = buildVerbMenu(broken);
+        const verbNames = items.map((i) => i.value?.verb).filter(Boolean);
+        expect(verbNames).toContain("list");
+        expect(verbNames).not.toContain("garbageVerb");
+    });
+});
+
+describe("dispatchVerb(verbName, resource, ctx, ns)", () => {
+    it("calls the matching UNIVERSAL_VERBS handler with (resource, ctx, ns)", async () => {
+        await dispatchVerb("list", podsResource, CTX, NS);
+        expect(listHandler).toHaveBeenCalledWith(podsResource, CTX, NS);
+    });
+
+    it("falls through to SPECIFIC_VERBS when the verb is not universal", async () => {
+        await dispatchVerb("scale", deploymentsResource, CTX, NS);
+        expect(scaleHandler).toHaveBeenCalledWith(deploymentsResource, CTX, NS);
+    });
+
+    it("returns whatever the handler resolves to (sentinels like RETURN_TO_MENU)", async () => {
+        listHandler.mockResolvedValueOnce("return-to-menu");
+        const result = await dispatchVerb("list", podsResource, CTX, NS);
+        expect(result).toBe("return-to-menu");
+    });
+
+    it("returns null when neither registry contains the verb", async () => {
+        const result = await dispatchVerb("nonexistent", podsResource, CTX, NS);
+        expect(result).toBeNull();
     });
 });

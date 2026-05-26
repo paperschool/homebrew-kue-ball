@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.8.0 — 2026-05-26
+
+- Main menu switched to two-level navigation: pick a resource (from the registry), then pick a verb (universal or specific). `← Back to resources` returns to the resource picker; the resource → verb loop stays on the same resource between actions.
+- Helm, Ping, Contexts, and Exit live as top-level extras alongside the resource list (existing `buildHelmCommands`/`buildPingCommands`/`buildContextsCommands` still drive their sub-menus until story 6-6's migration).
+- Sentinel handling (`RETURN_TO_MENU`, `change-context`, `change-namespace`) preserved through the new flow.
+
 ## v1.7.0 — 2026-05-26
 
 - Added node-management specific verbs to `SPECIFIC_VERBS`: `cordon`, `uncordon`, `drain` (with confirm + exit-keys streaming), and `taint` (regex-validated spec).

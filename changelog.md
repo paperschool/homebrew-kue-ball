@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.4.0 — 2026-05-26
+
+- Added `src/lib/resources.js` — the resource registry that will back the upcoming two-level (resource → verb) menu. Ships with the 8 resources currently covered by `src/commands/*` (Pods, Deployments, ReplicaSets, ConfigMaps, Secrets, Ingress, ServiceAccounts, Services), each with kind/plural/displayName/group/namespaced and universal/specific verb arrays.
+- Registry is loaded at import time with a duplicate-kind invariant; `getResource(kind)` returns `null` on miss.
+- Story 6-1 marked `review`. No menu or command-module changes yet — those land in stories 6-2 through 6-6.
+
 ## v1.3.3 — 2026-05-26
 
 - Created enriched story files for Epic 6 stories 6-1 through 6-8 (Resource × Verb Menu Redesign) under `.product_design/implementation-artifacts/`.

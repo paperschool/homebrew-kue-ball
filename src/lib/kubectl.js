@@ -6,6 +6,12 @@ export function isKubectlAvailable() {
     return !!run("which kubectl", { silent: true });
 }
 
+export function getKubectlVersion() {
+    const raw = run("kubectl version --client", { silent: true });
+    const match = raw?.match(/v\d+\.\d+\.\d+[\w.-]*/);
+    return match?.[0] ?? null;
+}
+
 export function getCurrentContext() {
     return run("kubectl config current-context", { silent: true }) ?? "(none)";
 }

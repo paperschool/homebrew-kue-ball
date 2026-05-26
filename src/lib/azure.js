@@ -1,7 +1,8 @@
 import { confirm } from "@inquirer/prompts";
+import { setLastCommand, setLastCommandRun, isActive as chromeActive, getContentRows, step } from "../ui/chrome.js";
 import { searchPrompt as search, Separator } from "../ui/searchPrompt.js";
 import { spawnSync } from "child_process";
-import { run, spawnInteractive } from "./shell.js";
+import { run, spawnInteractive, captureCommand } from "./shell.js";
 import { warn, ok, info, DIM, CYAN, RESET, YELLOW, BOLD } from "./output.js";
 import { loadPrefs, savePrefs } from "./prefs.js";
 import { getContexts } from "./kubectl.js";
@@ -18,6 +19,17 @@ export function subscriptionForContext(contextName) {
 
 export function isAzCliAvailable() {
     return !!run("az version", { silent: true });
+}
+
+export function getAzVersion() {
+    const raw = run("az version --output json", { silent: true });
+    if (!raw) return null;
+    try {
+        const ver = JSON.parse(raw)["azure-cli"];
+        return ver ? `v${ver}` : null;
+    } catch {
+        return null;
+    }
 }
 
 export function isPermissionError(errorMsg) {
@@ -169,13 +181,16 @@ export async function refreshContexts() {
 
     const existingContexts = getContexts();
     if (existingContexts.length > 0) {
+        setLastCommand("Clear existing contexts");
+        step("Clear existing contexts?", `You have ${existingContexts.length} kubeconfig context(s). Wiping them keeps your kubeconfig tidy before adding new ones.`);
         const doWipe = await confirm({
-            message: `Clear all ${existingContexts.length} existing kubeconfig context(s) before pulling fresh credentials?`,
+            message: `Clear all ${existingContexts.length} existing context(s)?`,
             default: true,
             clearPromptOnDone: true,
         });
         if (doWipe) {
             for (const ctx of existingContexts) {
+                setLastCommandRun(`kubectl config delete-context "${ctx}"`);
                 run(`kubectl config delete-context "${ctx}"`, { silent: true });
                 run(`kubectl config unset "users.${ctx}"`, { silent: true });
             }
@@ -183,9 +198,10 @@ export async function refreshContexts() {
         }
     }
 
-    console.log("");
-
-    process.stdout.write(`  ${DIM}Fetching subscriptions from Azure (--refresh)…${RESET}`);
+    setLastCommand("Fetch Azure subscriptions");
+    setLastCommandRun(`az account list --refresh --query "[].{id:id,name:name}" --output json`);
+    step("Choose subscriptions", "Select which Azure subscriptions to scan for AKS clusters.");
+    process.stdout.write(`  ${DIM}Fetching subscriptions from Azure…${RESET}`);
     const subs = listSubscriptions({ refresh: true });
     process.stdout.write("\r\x1b[2K");
 
@@ -202,16 +218,15 @@ export async function refreshContexts() {
         subs.push(...retried);
     }
 
-    ok(`Found ${subs.length} subscription(s)`);
-    console.log("");
-
     const prefs = loadPrefs();
     const freq = prefs.subFrequency ?? {};
     const used = subs
         .filter((s) => freq[s.id] > 0)
         .sort((a, b) => (freq[b.id] ?? 0) - (freq[a.id] ?? 0));
 
-    const subPageSize = () => Math.max(8, (process.stdout.rows ?? 24) - 4);
+    const pickerPageSize = () => chromeActive()
+        ? Math.max(4, getContentRows() - 2)
+        : Math.max(4, (process.stdout.rows ?? 24) - 4);
     const selectedSubs = new Map(
         (used.length > 0 ? used : subs).map((s) => [s.id, s])
     );
@@ -220,7 +235,7 @@ export async function refreshContexts() {
     while (choosingSubs) {
         const action = await search({
             message: `Subscriptions to scan  ${DIM}(${selectedSubs.size} selected — pick to toggle)${RESET}:`,
-            pageSize: subPageSize,
+            pageSize: pickerPageSize,
             source: (input) => {
                 const q = stripAnsi(input ?? "").trim().toLowerCase();
                 const filtered = q ? subs.filter((s) => fuzzyMatch(q, s.name)) : subs;
@@ -266,14 +281,12 @@ export async function refreshContexts() {
         freq[s.id] = (freq[s.id] ?? 0) + 1;
     }
     savePrefs({ ...prefs, subFrequency: freq });
-    console.log("");
-    console.log(`  ${DIM}Scanning ${chosenSubs.length} subscription(s) for AKS clusters…${RESET}`);
+
+    setLastCommand("Scan subscriptions for AKS clusters");
+    step("Choose clusters", "Select which AKS clusters to add to your kubeconfig.");
 
     let { results: clusters, retry } = await listAllAksClusters(chosenSubs);
-    if (retry) {
-        console.log(`  ${DIM}Scanning ${chosenSubs.length} subscription(s) for AKS clusters…${RESET}`);
-        ({ results: clusters } = await listAllAksClusters(chosenSubs));
-    }
+    if (retry) ({ results: clusters } = await listAllAksClusters(chosenSubs));
 
     if (clusters.length === 0) {
         warn("No AKS clusters found across any subscription.");
@@ -286,47 +299,66 @@ export async function refreshContexts() {
     }
 
     const orderedSubs = Object.keys(bySub).sort((a, b) => a.localeCompare(b));
-    const terminalPageSize = () => Math.max(8, (process.stdout.rows ?? 24) - 4);
+    const clusterKey = (c) => `${c.subscriptionId}/${c.resourceGroup}/${c.name}`;
 
-    const chosen = await search({
-        message: "Pull credentials for:",
-        pageSize: terminalPageSize,
-        source: (input) => {
-            const q = stripAnsi(input ?? "").trim().toLowerCase();
-            const results = [];
+    const selectedClusters = new Map(clusters.map((c) => [clusterKey(c), c]));
 
-            if (!q || fuzzyMatch(q, "All clusters")) {
+    let choosingClusters = true;
+    while (choosingClusters) {
+        const action = await search({
+            message: `Clusters to pull credentials for  ${DIM}(${selectedClusters.size} selected — pick to toggle)${RESET}:`,
+            pageSize: pickerPageSize,
+            source: (input) => {
+                const q = stripAnsi(input ?? "").trim().toLowerCase();
+                const results = [];
+
                 results.push({
-                    name: `All clusters  ${DIM}(${clusters.length} across ${orderedSubs.length} subscription(s))${RESET}`,
-                    value: "all",
+                    name: `  ✓  Confirm selection  ${DIM}(${selectedClusters.size} cluster(s))${RESET}`,
+                    value: "__confirm__",
                 });
-            }
 
-            for (const subName of orderedSubs) {
-                const subClusters = bySub[subName] ?? [];
-                const matching = q
-                    ? subClusters.filter((c) => {
-                        const haystack = `${c.name} ${c.resourceGroup} ${c.location} ${c.subscriptionName}`;
-                        return fuzzyMatch(q, haystack);
-                    })
-                    : subClusters;
+                for (const subName of orderedSubs) {
+                    const subClusters = bySub[subName] ?? [];
+                    const matching = q
+                        ? subClusters.filter((c) => {
+                            const haystack = `${c.name} ${c.resourceGroup} ${c.location} ${c.subscriptionName}`;
+                            return fuzzyMatch(q, haystack);
+                        })
+                        : subClusters;
 
-                if (matching.length > 0) {
-                    results.push(new Separator(`  ${CYAN}${DIM}── ${subName} ──${RESET}`));
-                    for (const c of matching) {
-                        results.push({
-                            name: `  ${c.name}  ${DIM}(${c.resourceGroup} · ${c.location})${RESET}`,
-                            value: c,
-                        });
+                    if (matching.length > 0) {
+                        results.push(new Separator(`  ${CYAN}${DIM}── ${subName} ──${RESET}`));
+                        for (const c of matching) {
+                            const tick = selectedClusters.has(clusterKey(c)) ? "◉" : "○";
+                            results.push({
+                                name: `  ${tick}  ${c.name}  ${DIM}(${c.resourceGroup} · ${c.location})${RESET}`,
+                                value: c,
+                            });
+                        }
                     }
                 }
+
+                return results;
+            },
+        });
+
+        if (action === "__confirm__") {
+            if (selectedClusters.size === 0) {
+                warn("Select at least one cluster.");
+            } else {
+                choosingClusters = false;
             }
+        } else {
+            const key = clusterKey(action);
+            if (selectedClusters.has(key)) {
+                selectedClusters.delete(key);
+            } else {
+                selectedClusters.set(key, action);
+            }
+        }
+    }
 
-            return results;
-        },
-    });
-
-    const targets = chosen === "all" ? clusters : [chosen];
+    const targets = [...selectedClusters.values()];
     // az names each context after the cluster, so same-named clusters would overwrite one
     // another in the kubeconfig. Disambiguate name collisions with the resource group (kept
     // shell/kubeconfig-safe) so every refreshed cluster is saved as its own switchable context.
@@ -335,14 +367,17 @@ export async function refreshContexts() {
     const safe = (s) => String(s ?? "").replace(/[^A-Za-z0-9._-]/g, "-");
     const contextNameFor = (c) => (nameCounts[c.name] > 1 ? `${c.name}_${safe(c.resourceGroup)}` : c.name);
 
+    setLastCommand(`Pull credentials  ${DIM}(az aks get-credentials)${RESET}`);
+    step("Pulling credentials", `Running az aks get-credentials for each of the ${targets.length} selected cluster(s).`);
+
     let added = 0;
     const contextSubs = {}; // contextName -> subscriptionName, persisted so the footer can show it
     for (const cluster of targets) {
         const contextName = contextNameFor(cluster);
-        console.log(
-            `\n  ${DIM}▶ az aks get-credentials --subscription ${cluster.subscriptionId} --resource-group ${cluster.resourceGroup} --name ${cluster.name} --context ${contextName} --overwrite-existing${RESET}\n`
-        );
-        const code = await spawnInteractive("az", [
+        const credCmd = `az aks get-credentials --subscription ${cluster.subscriptionId} --resource-group ${cluster.resourceGroup} --name ${cluster.name} --context ${contextName} --overwrite-existing`;
+        setLastCommandRun(credCmd);
+        process.stdout.write(`  ${DIM}Pulling credentials for ${cluster.name}…${RESET}`);
+        const { code } = await captureCommand("az", [
             "aks",
             "get-credentials",
             "--subscription",
@@ -355,6 +390,7 @@ export async function refreshContexts() {
             contextName,
             "--overwrite-existing",
         ]);
+        process.stdout.write("\r\x1b[2K");
         if (code === 0) {
             added++;
             contextSubs[contextName] = cluster.subscriptionName ?? "";
@@ -371,9 +407,8 @@ export async function refreshContexts() {
         savePrefs({ ...prefs, contextSubscriptions: { ...(prefs.contextSubscriptions ?? {}), ...contextSubs } });
     }
 
-    console.log("");
     if (added > 0) {
-        ok(`${added} context(s) added. Restart the wizard to use them.`);
+        ok(`${added} context(s) added.`);
     } else {
         warn("No contexts were added — see errors above.");
     }

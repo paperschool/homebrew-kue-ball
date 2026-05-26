@@ -11,11 +11,15 @@ vi.mock("./commands/resources.js", () => ({ buildResourcesCommands: vi.fn().mock
 vi.mock("./commands/contexts.js", () => ({ buildContextsCommands: vi.fn().mockReturnValue([]) }));
 vi.mock("./commands/exec.js", () => ({ buildExecCommands: vi.fn().mockReturnValue([]) }));
 vi.mock("./commands/helm.js", () => ({ buildHelmCommands: vi.fn().mockReturnValue([]) }));
-vi.mock("./lib/helm.js", () => ({ isHelmAvailable: vi.fn().mockReturnValue(true) }));
+vi.mock("./lib/helm.js", () => ({
+    isHelmAvailable: vi.fn().mockReturnValue(true),
+    getHelmVersion: vi.fn().mockReturnValue("v3.14.0"),
+}));
 vi.mock("./commands/ping.js", () => ({ buildPingCommands: vi.fn().mockReturnValue([]) }));
 
 vi.mock("./lib/kubectl.js", () => ({
     isKubectlAvailable: vi.fn().mockReturnValue(true),
+    getKubectlVersion: vi.fn().mockReturnValue("v1.30.0"),
     getCurrentContext: vi.fn().mockReturnValue("default-ctx"),
     getContexts: vi.fn().mockReturnValue(["default-ctx"]),
     getNamespaces: vi.fn().mockReturnValue([]),
@@ -28,6 +32,7 @@ vi.mock("./lib/azure.js", () => ({
     showPimReminder: vi.fn(),
     subscriptionForContext: vi.fn().mockReturnValue(null),
     isAzCliAvailable: vi.fn().mockReturnValue(true),
+    getAzVersion: vi.fn().mockReturnValue("v2.56.0"),
 }));
 
 vi.mock("./lib/output.js", () => ({
@@ -69,6 +74,8 @@ vi.mock("./ui/chrome.js", () => ({
     setContextInfo: vi.fn(),
     setLastCommand: vi.fn(),
     setSubscription: vi.fn(),
+    step: vi.fn(),
+    getStepHeaderRows: vi.fn().mockReturnValue(0),
 }));
 
 vi.mock("./ui/authPoller.js", () => ({

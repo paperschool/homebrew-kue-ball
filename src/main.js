@@ -11,16 +11,16 @@ import { buildContextsCommands } from "./commands/contexts.js";
 import { buildExecCommands } from "./commands/exec.js";
 import { buildHelmCommands } from "./commands/helm.js";
 import { buildPingCommands } from "./commands/ping.js";
-import { isKubectlAvailable, getCurrentContext, getContexts, getNamespaces, useContext } from "./lib/kubectl.js";
-import { isHelmAvailable } from "./lib/helm.js";
+import { isKubectlAvailable, getKubectlVersion, getCurrentContext, getContexts, getNamespaces, useContext } from "./lib/kubectl.js";
+import { isHelmAvailable, getHelmVersion } from "./lib/helm.js";
 import { ok, warn, CYAN, YELLOW, DIM, RESET, BOLD, RED, styleDeleteCommandLabel } from "./lib/output.js";
 import { APP_NAME, DEFAULT_NAMESPACE, DEFAULT_CONTEXT } from "./lib/env.js";
-import { refreshContexts, isPermissionError, showPimReminder, subscriptionForContext, isAzCliAvailable } from "./lib/azure.js";
+import { refreshContexts, isPermissionError, showPimReminder, subscriptionForContext, isAzCliAvailable, getAzVersion } from "./lib/azure.js";
 import { RETURN_TO_MENU } from "./lib/runner.js";
 import { searchableList } from "./ui/searchableList.js";
-import { initChrome, loadIdentity, setAuthStatus, drawSplash, hideSplash, setContextInfo, setLastCommand, setSubscription } from "./ui/chrome.js";
+import { initChrome, loadIdentity, setAuthStatus, drawSplash, hideSplash, setContextInfo, setLastCommand, setSubscription, step } from "./ui/chrome.js";
 import { startAuthPoller, stopAuthPoller } from "./ui/authPoller.js";
-import { confirm, select, input } from "@inquirer/prompts";
+import { confirm, input } from "@inquirer/prompts";
 
 export function buildAllCommands(ctx, ns) {
     return [
@@ -44,7 +44,6 @@ async function pickContext() {
     let contexts = getContexts();
     if (contexts.length === 0) {
         warn("No kubeconfig contexts found.");
-        console.log("");
         const refreshed = await refreshContexts();
         if (!refreshed) {
             console.log(`\n  ${DIM}Run the wizard again once you have contexts.${RESET}\n`);
@@ -59,16 +58,17 @@ async function pickContext() {
         }
     }
     if (contexts.length === 1) {
+        step("Context selected", `Only one cluster is in your kubeconfig — using it for this session.`);
         ok(`Using context: ${CYAN}${contexts[0]}${RESET}`);
         return contexts[0];
     }
+    step("Select context", "Pick which cluster to use for this session.");
     const sorted = DEFAULT_CONTEXT
         ? [...contexts.filter((c) => c.includes(DEFAULT_CONTEXT)), ...contexts.filter((c) => !c.includes(DEFAULT_CONTEXT))]
         : contexts;
-    return select({
+    return searchableList({
         message: "Select kubeconfig context:",
-        choices: sorted.map((c) => ({ name: c === currentCtx ? `${c}  ${DIM}(current)${RESET}` : c, value: c })),
-        default: currentCtx,
+        items: sorted.map((c) => ({ name: c === currentCtx ? `${c}  ${DIM}(current)${RESET}` : c, value: c })),
     });
 }
 
@@ -80,6 +80,7 @@ async function pickNamespace(ctx) {
         warn("Could not list namespaces — you may not have permission.");
         return input({ message: "Namespace:", default: DEFAULT_NAMESPACE });
     }
+    step("Select namespace", "Pick the default namespace for this session.");
     const preferred =
         namespaces.find((n) => n === DEFAULT_NAMESPACE) ??
         (APP_NAME ? namespaces.find((n) => n.includes(APP_NAME)) : undefined);
@@ -95,28 +96,32 @@ async function pickNamespace(ctx) {
 // Verifies the required (kubectl) and optional (helm, az) CLIs up front. kubectl is fatal;
 // helm/az just warn. Returns whether az is available so the caller can gate the Azure refresh.
 function checkPrerequisites() {
-    const probe = (label, available) => {
+    const probe = (label, available, getVersion) => {
         process.stdout.write(`  ${DIM}Checking for ${label}…${RESET}`);
         const found = available();
+        const version = found ? getVersion() : null;
         process.stdout.write("\r\x1b[2K");
-        return found;
+        return { found, version };
     };
+    const label = (name, version) => version ? `${name} found  ${DIM}(${version})${RESET}` : `${name} found`;
 
-    if (!probe("kubectl", isKubectlAvailable)) {
+    const kubectl = probe("kubectl", isKubectlAvailable, getKubectlVersion);
+    if (!kubectl.found) {
         process.stderr.write(`  ${RED}✗ kubectl not found.${RESET}\n`);
         process.stderr.write(`  ${DIM}  Install it via: brew install kubectl${RESET}\n\n`);
         process.exit(1);
     }
-    ok("kubectl found");
+    ok(label("kubectl", kubectl.version));
 
-    if (probe("helm", isHelmAvailable)) ok("helm found");
+    const helm = probe("helm", isHelmAvailable, getHelmVersion);
+    if (helm.found) ok(label("helm", helm.version));
     else warn("helm not found — Helm commands won't work (brew install helm).");
 
-    const azAvailable = probe("az CLI", isAzCliAvailable);
-    if (azAvailable) ok("az CLI found");
+    const az = probe("az CLI", isAzCliAvailable, getAzVersion);
+    if (az.found) ok(label("az CLI", az.version));
     else warn("az CLI not found — refreshing contexts from Azure is unavailable (brew install azure-cli).");
 
-    return { azAvailable };
+    return { azAvailable: az.found };
 }
 
 async function main() {
@@ -128,14 +133,14 @@ async function main() {
     drawSplash();
     const { azAvailable } = checkPrerequisites();
     if (azAvailable) {
-        const doRefresh = await confirm({ message: "Refresh contexts from Azure first? (az aks get-credentials)", default: false, clearPromptOnDone: true });
-        if (doRefresh) { console.log(""); await refreshContexts(); console.log(""); }
+        setLastCommand(`Refresh contexts  ${DIM}(az aks get-credentials)${RESET}`);
+        step("Refresh kubeconfig from Azure?", "Pull fresh AKS credentials and merge them into your kubeconfig.");
+        const doRefresh = await confirm({ message: "Refresh contexts now?", default: false, clearPromptOnDone: true });
+        if (doRefresh) await refreshContexts();
     }
     let context = await pickContext();
     if (!context) return;
-    console.log("");
     const namespace = await pickNamespace(context);
-    console.log("");
     setContextInfo(context, namespace);
     setSubscription(subscriptionForContext(context));
     hideSplash(); // entering the menu — the title art should no longer redraw on resize
@@ -161,10 +166,9 @@ async function main() {
                 const ctxList = getContexts();
                 if (ctxList.length === 0) { warn("No contexts found."); }
                 else {
-                    const newCtx = await select({
+                    const newCtx = await searchableList({
                         message: "Switch to context:",
-                        choices: ctxList.map((c) => ({ name: c === context ? `${c}  ${DIM}(current)${RESET}` : c, value: c })),
-                        default: context,
+                        items: ctxList.map((c) => ({ name: c === context ? `${c}  ${DIM}(current)${RESET}` : c, value: c })),
                     });
                     if (newCtx && newCtx !== context) {
                         context = newCtx;

@@ -1,6 +1,6 @@
 import { searchPrompt, Separator } from "./searchPrompt.js";
 import { CYAN, DIM, RESET, stripAnsi } from "../lib/output.js";
-import { isActive, getContentRows } from "./chrome.js";
+import { isActive, getContentRows, getStepHeaderRows } from "./chrome.js";
 
 export function fuzzyMatch(query, text) {
     const q = (query ?? "").toLowerCase();
@@ -13,13 +13,17 @@ export function fuzzyMatch(query, text) {
 }
 
 // Resolved live on every resize so the list always fits the content area.
+// Subtracts the step header rows so a titled wizard page leaves room for the title above.
 function computePageSize(pageSize) {
-    if (isActive()) return Math.max(4, getContentRows() - 2);
+    if (isActive()) return Math.max(4, getContentRows() - 3 - getStepHeaderRows());
     return pageSize ?? Math.max(8, (process.stdout.rows ?? 24) - 4);
 }
 
 export async function searchableList({ message, items, pageSize }) {
-    if (isActive()) {
+    // When a step header is present, render directly below it (cursor is already there).
+    // Without one, anchor the prompt near the bottom of the content area — the long-standing
+    // main-menu layout that lets command output scroll up above the menu.
+    if (isActive() && getStepHeaderRows() === 0) {
         const row = (process.stdout.rows ?? 24) - 3;
         process.stdout.write(`\x1b[${row};1H`);
     }

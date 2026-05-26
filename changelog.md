@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.0 — 2026-05-26
+
+- New `step()` chrome helper renders titled wizard pages with a clean content area; context picker, namespace picker, and Azure refresh now use it.
+- Azure refresh is now a true multi-select cluster picker (toggle clusters, confirm selection) and the subscription picker uses the same live page-size as the main menu.
+- Startup probes report detected versions of `kubectl`, `helm`, and `az CLI` alongside the existing availability checks.
+
 ## v1.1.0 — 2026-05-26
 
 - Pager `e` keybinding now launches `kubectl edit` for the resource you are describing, with `KUBE_EDITOR` honoured (falls back to `nano`).

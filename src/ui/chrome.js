@@ -1,4 +1,5 @@
 import { run } from "../lib/shell.js";
+import { BOLD, CYAN, DIM, RESET } from "../lib/output.js";
 
 const TITLE = "kue-ball";
 
@@ -57,6 +58,7 @@ let _exitHandler = null;
 let _resizeTimer = null;
 let _lastRows = 0;
 let _splashVisible = false;
+let _stepHeaderRows = 0; // rows consumed by the active step()'s title block; lets prompts pin below it
 const _resizeSubscribers = new Set();
 
 function cols() { return process.stdout.columns ?? 80; }
@@ -462,4 +464,41 @@ export function drawSplash() {
     moveTo(Math.max((belowArt ?? _contentStart()) + 1, rows() - 3), 1);
 }
 
-export function hideSplash() { _splashVisible = false; }
+export function hideSplash() { _splashVisible = false; _stepHeaderRows = 0; }
+
+export function getStepHeaderRows() { return _stepHeaderRows; }
+
+// Wipes everything in the content area (between the chrome header and the status bar)
+// and parks the cursor at the top of that region. Used by `step()` to give each wizard
+// page a clean slate so the previous prompt's leftovers don't accumulate down the screen.
+export function clearContent() {
+    if (!active) return;
+    _stepHeaderRows = 0;
+    const top = _contentStart();
+    const last = rows() - 1;
+    for (let r = top; r <= last; r++) {
+        moveTo(r, 1);
+        w("\x1b[2K");
+    }
+    moveTo(top, 1);
+}
+
+// Renders a wizard "page": clears the content area and prints a bold title + dim
+// description at the top, leaving the cursor positioned for a prompt to render below.
+// Records the title-block height in _stepHeaderRows so searchableList can pin the prompt
+// directly under it (rather than the default "anchored to bottom" main-menu layout).
+export function step(title, description) {
+    if (!active) {
+        console.log(`\n  ${title}`);
+        if (description) console.log(`  ${description}`);
+        console.log("");
+        return;
+    }
+    _splashVisible = false;
+    clearContent();
+    let lines = 0;
+    w(`  ${BOLD}${CYAN}${title}${RESET}\r\n`); lines++;
+    if (description) { w(`  ${DIM}${description}${RESET}\r\n`); lines++; }
+    w("\r\n"); lines++;
+    _stepHeaderRows = lines;
+}

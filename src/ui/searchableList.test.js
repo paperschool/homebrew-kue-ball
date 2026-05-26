@@ -20,6 +20,7 @@ vi.mock("../lib/output.js", () => ({
 vi.mock("./chrome.js", () => ({
     isActive: vi.fn().mockReturnValue(false),
     getContentRows: vi.fn().mockReturnValue(20),
+    getStepHeaderRows: vi.fn().mockReturnValue(0),
 }));
 
 import * as prompt from "./searchPrompt.js";
@@ -142,7 +143,7 @@ describe("searchableList() — chrome-aware behaviour (Story 5.4)", () => {
         vi.mocked(chrome.getContentRows).mockReturnValue(25);
         await searchableList({ message: "Pick:", items: [] });
         expect(typeof pageSizeOf()).toBe("function");
-        expect(pageSizeOf()()).toBe(Math.max(4, 25 - 2));
+        expect(pageSizeOf()()).toBe(Math.max(4, 25 - 3));
     });
 
     it("reflects the live content height each time the pageSize function is called", async () => {
@@ -150,9 +151,9 @@ describe("searchableList() — chrome-aware behaviour (Story 5.4)", () => {
         vi.mocked(chrome.getContentRows).mockReturnValue(25);
         await searchableList({ message: "Pick:", items: [] });
         const resolve = pageSizeOf();
-        expect(resolve()).toBe(23);
+        expect(resolve()).toBe(22);
         vi.mocked(chrome.getContentRows).mockReturnValue(10);
-        expect(resolve()).toBe(8);
+        expect(resolve()).toBe(7);
     });
 
     it("writes cursor-positioning escape before the prompt when chrome is active", async () => {

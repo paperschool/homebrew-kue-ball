@@ -12,10 +12,14 @@ import { isActive as chromeActive, onResize as onChromeResize, setSearchText } f
 
 export { Separator };
 
+// Symbol.for ensures the same identity across module duplicates / hot reload.
+export const BACK_SIGNAL = Symbol.for("kueball.searchPrompt.back");
+
 const POINTER = "❯";
 const RESIZE_DEBOUNCE_MS = 80;
 const DEFAULT_PAGE_SIZE = 7;
-const HELP_LINE = `${DIM}↑↓ navigate · ⏎ select${RESET}`;
+const HELP_LINE_DEFAULT = `${DIM}↑↓ navigate · ⏎ select${RESET}`;
+const HELP_LINE_WITH_BACK = `${DIM}↑↓ navigate · ⏎ select · ⌫/← back${RESET}`;
 
 export function resolvePageSize(pageSize) {
     const value = typeof pageSize === "function" ? pageSize() : pageSize;
@@ -40,7 +44,13 @@ export const searchPrompt = createPrompt((config, done) => {
     const [searchResults, setSearchResults] = useState([]);
     const [searchError, setSearchError] = useState();
     const [layout, setLayout] = useState(() => ({ pageSize: resolvePageSize(config.pageSize) }));
+    // prevLine tracks the input line as of the previous keypress, so we can distinguish
+    // a backspace that just emptied the field (don't go back) from one against an already-
+    // empty field (do go back). Without this, the first backspace after typing would fire.
+    const [prevLine, setPrevLine] = useState("");
+    const [backed, setBacked] = useState(false);
     const prefix = usePrefix({ status });
+    const enableBack = config.enableBack === true;
 
     const bounds = useMemo(() => ({
         first: searchResults.findIndex(isSelectable),
@@ -91,6 +101,16 @@ export const searchPrompt = createPrompt((config, done) => {
     const selectedChoice = searchResults[active];
 
     useKeypress((key, rl) => {
+        // Back-navigation: backspace against an already-empty line, or left arrow on empty line.
+        // Guard rl.line === "" AND prevLine === "" for backspace — otherwise the first BS that
+        // clears typed text would falsely trigger back.
+        if (enableBack && key.name === "backspace" && rl.line === "" && prevLine === "") {
+            setStatus("done"); setBacked(true); done(BACK_SIGNAL); return;
+        }
+        if (enableBack && key.name === "left" && rl.line === "") {
+            setStatus("done"); setBacked(true); done(BACK_SIGNAL); return;
+        }
+
         if (isEnterKey(key)) {
             if (selectedChoice) { setStatus("done"); done(selectedChoice.value); }
             else rl.write(searchTerm);
@@ -110,6 +130,7 @@ export const searchPrompt = createPrompt((config, done) => {
         } else {
             setSearchTerm(rl.line);
         }
+        setPrevLine(rl.line);
     });
 
     const page = usePagination({
@@ -120,6 +141,9 @@ export const searchPrompt = createPrompt((config, done) => {
         loop: false,
     });
 
+    if (status === "done" && backed) {
+        return `${prefix} ${config.message} ${DIM}← back${RESET}`.trimEnd();
+    }
     if (status === "done" && selectedChoice) {
         return `${prefix} ${config.message} ${CYAN}${selectedChoice.name}${RESET}`.trimEnd();
     }
@@ -132,6 +156,7 @@ export const searchPrompt = createPrompt((config, done) => {
     // (@inquirer/core slices rl.line off the end of this line; with a short, non-wrapping
     // prompt the hidden cursor stays consistent, so omitting the query renders cleanly.)
     const header = [prefix, config.message].filter(Boolean).join(" ");
-    const body = [error ?? page, " ", HELP_LINE].join("\n");
+    const helpLine = enableBack ? HELP_LINE_WITH_BACK : HELP_LINE_DEFAULT;
+    const body = [error ?? page, " ", helpLine].join("\n");
     return [header, body];
 });

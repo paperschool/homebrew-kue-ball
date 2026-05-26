@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.12.0 — 2026-05-26
+
+- **Back-nav by keyboard.** In any sub-picker (verb picker, Helm / Ping / Events / Contexts sub-menus), hitting backspace against an empty search input or left arrow returns to the parent menu. The bottom hint line now reads `↑↓ navigate · ⏎ select · ⌫/← back`.
+- **Colour-coded verb labels.** `delete` is red, `edit` is yellow, `logs` / `logsPrevious` / `logsToFile` are blue. Match is on the verb key so renaming `displayName` doesn't break the colouring.
+- `← Back` list items in sub-pickers now render dim grey to deemphasise them next to the actual actions.
+
 ## v1.11.0 — 2026-05-26
 
 - Resource registry now exposes **Nodes** under a new "Cluster" group and **HPA / PVC / PV** under "Storage". All four use the existing universal/specific verb handlers; cluster-scoped resources (Nodes, PV) auto-omit `--namespace`.

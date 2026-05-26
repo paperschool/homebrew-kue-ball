@@ -6,11 +6,11 @@ import { UNIVERSAL_VERBS } from "./lib/universalVerbs.js";
 import { SPECIFIC_VERBS } from "./lib/specificVerbs.js";
 import { isKubectlAvailable, getKubectlVersion, getCurrentContext, getContexts, getNamespaces, useContext } from "./lib/kubectl.js";
 import { isHelmAvailable, getHelmVersion } from "./lib/helm.js";
-import { ok, warn, CYAN, YELLOW, DIM, RESET, RED, styleDeleteCommandLabel } from "./lib/output.js";
+import { ok, warn, CYAN, YELLOW, DIM, RESET, RED, styleDeleteCommandLabel, styleVerbLabel } from "./lib/output.js";
 import { APP_NAME, DEFAULT_NAMESPACE, DEFAULT_CONTEXT } from "./lib/env.js";
 import { refreshContexts, isPermissionError, showPimReminder, subscriptionForContext, isAzCliAvailable, getAzVersion } from "./lib/azure.js";
 import { RETURN_TO_MENU, runLive } from "./lib/runner.js";
-import { searchableList } from "./ui/searchableList.js";
+import { searchableList, BACK_SIGNAL } from "./ui/searchableList.js";
 import { initChrome, loadIdentity, setAuthStatus, drawSplash, hideSplash, setContextInfo, setLastCommand, setSubscription, step } from "./ui/chrome.js";
 import { startAuthPoller, stopAuthPoller } from "./ui/authPoller.js";
 import { confirm, input } from "@inquirer/prompts";
@@ -75,11 +75,11 @@ export function buildVerbMenu(resource) {
             continue;
         }
         items.push({
-            name: entry.displayName,
+            name: styleVerbLabel(verb, entry.displayName),
             value: { verb, handler: entry.handler },
         });
     }
-    items.push({ name: "← Back to resources", value: { back: true } });
+    items.push({ name: `${DIM}← Back to resources${RESET}`, value: { back: true } });
     return items;
 }
 
@@ -181,10 +181,10 @@ async function runLegacySubmenu(label, builder, ctx, ns) {
     }
     const items = [
         ...commands.map((cmd) => ({ name: styleDeleteCommandLabel(cmd.name), value: cmd, group: cmd.group })),
-        { name: "← Back", value: { back: true } },
+        { name: `${DIM}← Back${RESET}`, value: { back: true } },
     ];
-    const picked = await searchableList({ message: `${label} action:`, items });
-    if (!picked || picked.back) return null;
+    const picked = await searchableList({ message: `${label} action:`, items, enableBack: true });
+    if (!picked || picked === BACK_SIGNAL || picked.back) return null;
     setLastCommand(picked.name);
     return picked.run();
 }
@@ -266,8 +266,8 @@ async function main() {
         let stayOnResource = true;
         while (stayOnResource) {
             step(`${resource.displayName} — choose action`, "Pick an operation to run.");
-            const picked = await searchableList({ message: "Action:", items: buildVerbMenu(resource) });
-            if (!picked || picked.back) { stayOnResource = false; break; }
+            const picked = await searchableList({ message: "Action:", items: buildVerbMenu(resource), enableBack: true });
+            if (!picked || picked === BACK_SIGNAL || picked.back) { stayOnResource = false; break; }
             setLastCommand(`${resource.displayName}: ${picked.verb}`);
             try {
                 const result = await dispatchVerb(picked.verb, resource, context, currentNamespace);

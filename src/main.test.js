@@ -36,7 +36,11 @@ vi.mock("./lib/output.js", () => ({
     RESET: "",
     BOLD: "",
     RED: "",
+    BLUE: "",
     styleDeleteCommandLabel: vi.fn((x) => x),
+    // Apply a sentinel wrapper so tests can assert the colouring path was taken,
+    // without coupling to ANSI escape sequences.
+    styleVerbLabel: vi.fn((verb, label) => `[${verb}]${label}`),
 }));
 
 vi.mock("./lib/env.js", () => ({
@@ -50,8 +54,11 @@ vi.mock("./lib/runner.js", () => ({
     runLive: vi.fn(),
 }));
 
+
+
 vi.mock("./ui/searchableList.js", () => ({
     searchableList: vi.fn(),
+    BACK_SIGNAL: Symbol.for("kueball.searchPrompt.back"),
 }));
 
 vi.mock("./ui/chrome.js", () => ({
@@ -172,10 +179,12 @@ describe("buildVerbMenu(resource)", () => {
         expect(items[items.length - 1].name).toContain("Back");
     });
 
-    it("looks up displayName via UNIVERSAL_VERBS / SPECIFIC_VERBS", () => {
+    it("passes each verb's displayName through styleVerbLabel for colouring", () => {
+        // The mock wraps as `[verb]Label`; assert the wrapper was invoked per verb.
         const items = buildVerbMenu(podsResource);
-        expect(items[0].name).toBe("List");
-        expect(items.find((i) => i.value?.verb === "logs").name).toBe("Stream logs");
+        expect(items[0].name).toBe("[list]List");
+        expect(items.find((i) => i.value?.verb === "logs").name).toBe("[logs]Stream logs");
+        expect(items.find((i) => i.value?.verb === "delete").name).toBe("[delete]Delete");
     });
 
     it("skips unknown verb names with a warn instead of crashing", () => {

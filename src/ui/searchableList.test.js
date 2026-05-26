@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("./searchPrompt.js", () => ({
     searchPrompt: vi.fn(),
+    BACK_SIGNAL: Symbol.for("kueball.searchPrompt.back"),
     Separator: class Separator {
         constructor(line) {
             this.type = "separator";
@@ -25,7 +26,7 @@ vi.mock("./chrome.js", () => ({
 
 import * as prompt from "./searchPrompt.js";
 import * as chrome from "./chrome.js";
-import { fuzzyMatch, searchableList } from "./searchableList.js";
+import { fuzzyMatch, searchableList, BACK_SIGNAL } from "./searchableList.js";
 
 describe("fuzzyMatch()", () => {
     it("returns true when every character of query appears in order in text", () => {
@@ -104,6 +105,24 @@ describe("searchableList()", () => {
         expect(separators).toHaveLength(2);
         expect(separators[0].separator).toContain("Pods");
         expect(separators[1].separator).toContain("Services");
+    });
+
+    it("does NOT pass enableBack to searchPrompt by default", async () => {
+        await searchableList({ message: "Pick:", items: [] });
+        expect(prompt.searchPrompt).toHaveBeenCalledWith(
+            expect.objectContaining({ enableBack: false })
+        );
+    });
+
+    it("forwards enableBack:true to searchPrompt when requested", async () => {
+        await searchableList({ message: "Pick:", items: [], enableBack: true });
+        expect(prompt.searchPrompt).toHaveBeenCalledWith(
+            expect.objectContaining({ enableBack: true })
+        );
+    });
+
+    it("re-exports BACK_SIGNAL from searchPrompt (same Symbol)", () => {
+        expect(BACK_SIGNAL).toBe(Symbol.for("kueball.searchPrompt.back"));
     });
 
     it("omits a group's Separator when no items in that group match the query", async () => {

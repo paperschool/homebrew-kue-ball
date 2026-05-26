@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-    CYAN, YELLOW, GREEN, RED, DIM, BOLD, RESET,
+    CYAN, YELLOW, GREEN, RED, BLUE, DIM, BOLD, RESET,
     stripAnsi,
     styleDeleteCommandLabel,
+    styleVerbLabel,
     ok,
     warn,
     info,
@@ -12,7 +13,7 @@ import {
 
 describe("ANSI constants", () => {
     it("exports non-empty ANSI escape strings", () => {
-        for (const constant of [CYAN, YELLOW, GREEN, RED, DIM, BOLD, RESET]) {
+        for (const constant of [CYAN, YELLOW, GREEN, RED, BLUE, DIM, BOLD, RESET]) {
             expect(typeof constant).toBe("string");
             expect(constant.length).toBeGreaterThan(0);
         }
@@ -52,6 +53,44 @@ describe("styleDeleteCommandLabel", () => {
     it("returns the label unchanged when 'delete' is absent", () => {
         const label = "list pods";
         expect(styleDeleteCommandLabel(label)).toBe(label);
+    });
+});
+
+describe("styleVerbLabel", () => {
+    it("colours the delete verb red", () => {
+        const result = styleVerbLabel("delete", "Delete");
+        expect(result).toContain(RED);
+        expect(result).toContain(RESET);
+        expect(stripAnsi(result)).toBe("Delete");
+    });
+
+    it("colours the edit verb yellow", () => {
+        const result = styleVerbLabel("edit", "Edit");
+        expect(result).toContain(YELLOW);
+        expect(stripAnsi(result)).toBe("Edit");
+    });
+
+    it("colours the logs verb blue", () => {
+        const result = styleVerbLabel("logs", "Stream logs");
+        expect(result).toContain(BLUE);
+        expect(stripAnsi(result)).toBe("Stream logs");
+    });
+
+    it("also colours logsPrevious and logsToFile blue (prefix match)", () => {
+        expect(styleVerbLabel("logsPrevious", "Previous container logs")).toContain(BLUE);
+        expect(styleVerbLabel("logsToFile",   "Dump logs to file")).toContain(BLUE);
+    });
+
+    it("returns the label unchanged for verbs without a colour rule", () => {
+        expect(styleVerbLabel("list", "List")).toBe("List");
+        expect(styleVerbLabel("describe", "Describe")).toBe("Describe");
+        expect(styleVerbLabel("scale", "Scale")).toBe("Scale");
+    });
+
+    it("matches the verb KEY, not the label — renaming displayName does not break colouring", () => {
+        const renamed = styleVerbLabel("delete", "Remove forever");
+        expect(renamed).toContain(RED);
+        expect(stripAnsi(renamed)).toBe("Remove forever");
     });
 });
 

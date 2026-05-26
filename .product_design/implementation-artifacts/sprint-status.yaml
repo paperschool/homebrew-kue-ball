@@ -93,13 +93,13 @@ development_status:
   epic-5-retrospective: optional
 
   # Epic 6 — Resource × Verb Menu Redesign
-  epic-6: backlog
-  6-1-resources-js-resource-registry: backlog
-  6-2-universal-verbs-generic-list-describe-delete-edit: backlog
-  6-3-specific-verbs-pod-workload-specific-verbs: backlog
-  6-4-node-specific-verbs-cordon-uncordon-drain-taint: backlog
-  6-5-resource-verb-menu-navigation-in-main-js: backlog
-  6-6-migrate-existing-command-modules-into-the-registry: backlog
-  6-7-add-new-resources-statefulsets-daemonsets-jobs-cronjobs: backlog
-  6-8-add-cluster-scoped-storage-resources-nodes-hpa-pvc-pv: backlog
+  epic-6: in-progress
+  6-1-resources-js-resource-registry: ready-for-dev
+  6-2-universal-verbs-generic-list-describe-delete-edit: ready-for-dev
+  6-3-specific-verbs-pod-workload-specific-verbs: ready-for-dev
+  6-4-node-specific-verbs-cordon-uncordon-drain-taint: ready-for-dev
+  6-5-resource-verb-menu-navigation-in-main-js: ready-for-dev
+  6-6-migrate-existing-command-modules-into-the-registry: ready-for-dev
+  6-7-add-new-resources-statefulsets-daemonsets-jobs-cronjobs: ready-for-dev
+  6-8-add-cluster-scoped-storage-resources-nodes-hpa-pvc-pv: ready-for-dev
   epic-6-retrospective: optional

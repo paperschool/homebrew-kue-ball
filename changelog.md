@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.3 — 2026-05-26
+
+- Created enriched story files for Epic 6 stories 6-1 through 6-8 (Resource × Verb Menu Redesign) under `.product_design/implementation-artifacts/`.
+- Marked Epic 6 in-progress and flipped all 8 stories to `ready-for-dev` in sprint-status.yaml.
+
 ## v1.3.2 — 2026-05-26
 
 - Expanded Epic 6 (Resource × Verb Menu Redesign) breakdown in planning artifacts and seeded sprint-status tracking for stories 6-1 through 6-8.

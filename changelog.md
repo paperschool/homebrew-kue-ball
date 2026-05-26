@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.12.3 — 2026-05-26
+
+- Prereq check output (`✓ kubectl/helm/az found`) is now locked to the bottom of the screen — anchored to `rows() - 4` rather than parked right under the splash. The buffer is exactly large enough that the third trailing `\n` lands on `rows() - 1` (the row directly above the status bar) without crossing the scroll-region bottom, so the splash doesn't get bumped up.
+
 ## v1.12.2 — 2026-05-26
 
 - **Splash redesign.** Letter faces now run a four-tier shading gradient — solid white `█` (sparse) → light-blue ▒ (lightest blue, 256-colour 153) → ▓ (lighter blue, 117) → solid █ (light blue, 75). Depth/edge glyphs (`╗ ║ ╚ ═` etc.) shift from dark steel to the same light blue 75 so the dense face fuses with the shadow. The "By Ono Sendai Runner" byline is bright white.

@@ -549,11 +549,12 @@ export function drawSplash() {
     if (!active) return;
     _splashVisible = true;
     const belowArt = _drawSplashArt();
-    // Position cursor immediately below the splash (NOT anchored to rows()-3): keeps prereq
-    // prints clustered with the art and, crucially, leaves a buffer of empty rows between
-    // the prereq output and the scroll region bottom so console.log("…\n") can't trigger
-    // a scroll that would shift the splash up.
-    moveTo((belowArt ?? _contentStart()) + 1, 1);
+    // Park cursor near the bottom so prereq prints (✓ kubectl/helm/az) lock to the lower
+    // portion of the screen — visually balanced under the splash. We pick `rows() - 4` so
+    // that 3 prereq lines (each ending in \n via console.log) finish with the cursor on
+    // row `rows() - 1` (the row just above the status bar) WITHOUT crossing the scroll
+    // region bottom, which would scroll the splash up by a line.
+    moveTo(Math.max((belowArt ?? _contentStart()) + 1, rows() - 4), 1);
     if (!_splashAnimTimer) {
         _splashAnimTimer = setInterval(_animateSplashFrame, SPLASH_ANIM_INTERVAL_MS);
         // Kick the first animated frame as soon as the event loop has a moment — otherwise

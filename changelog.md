@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.6.0 — 2026-05-26
+
+- Added `src/lib/specificVerbs.js` — 16 workload-specific verb handlers: `logs / logsPrevious / logsToFile`, `exec / execOneOff`, `scale` (with zero-replicas confirm), the six `rollout*` verbs (status / history / undo / restart / pause / resume), `setImage` / `setEnv`, `top`, and `portForward`.
+- All verbs accept any registry resource: cluster-scoped resources (e.g. Nodes) auto-omit `--namespace`; `top` works on both pods and nodes.
+- Destructive verbs (`scale` to 0, `rolloutUndo`, `rolloutRestart`, `setImage`) prompt before executing.
+
 ## v1.5.0 — 2026-05-26
 
 - Added `src/lib/universalVerbs.js` — the generic `list / describe / edit / delete` verb handlers that work against any registered resource, plus `pickResourceInstance(resource, ctx, ns)` (a generic equivalent of `pickPod`).

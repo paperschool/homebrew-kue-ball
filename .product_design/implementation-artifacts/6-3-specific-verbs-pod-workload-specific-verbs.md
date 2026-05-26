@@ -1,6 +1,6 @@
 # Story 6.3: `src/lib/specificVerbs.js` — pod & workload-specific verbs
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -33,47 +33,47 @@ so that Pods/Deployments/ReplicaSets/StatefulSets/DaemonSets all dispatch into t
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Define verb-handler skeleton** (AC: #1, #3, #4)
-  - [ ] Create `src/lib/specificVerbs.js` with `import { pickResourceInstance } from "./universalVerbs.js";` and `import { runLive, runLivePiped, runLivePipedWithExitKeys, runLiveWithOptionalWatch, runShell, isJqAvailable } from "./runner.js";`.
-  - [ ] Helper: `function baseArgs(resource, ctx, ns)` returns `["--context=" + ctx, ...(resource.namespaced ? [\`--namespace=${ns}\`] : [])]`. DRY the namespace-flag conditional across every handler.
+- [x] **Task 1: Define verb-handler skeleton** (AC: #1, #3, #4)
+  - [x] Create `src/lib/specificVerbs.js` with `import { pickResourceInstance } from "./universalVerbs.js";` and `import { runLive, runLivePiped, runLivePipedWithExitKeys, runLiveWithOptionalWatch, runShell, isJqAvailable } from "./runner.js";`.
+  - [x] Helper: `function baseArgs(resource, ctx, ns)` returns `["--context=" + ctx, ...(resource.namespaced ? [\`--namespace=${ns}\`] : [])]`. DRY the namespace-flag conditional across every handler.
 
-- [ ] **Task 2: Implement `logs`, `logsPrevious`, `logsToFile`** (AC: #5, #6, #7)
-  - [ ] Port the logic from `src/commands/logs.js:36-99` verbatim, but instead of `pickPod(ctx, ns)` use `pickResourceInstance(resource, ctx, ns)`. The `logs` verb is only registered on Pods today (but adding it to a registry-listed `resource` is a 6-7 concern; 6-3 just ships the implementation).
-  - [ ] `logs.displayName = "Stream logs"`, `logsPrevious.displayName = "Previous container logs"`, `logsToFile.displayName = "Dump logs to file"`.
+- [x] **Task 2: Implement `logs`, `logsPrevious`, `logsToFile`** (AC: #5, #6, #7)
+  - [x] Port the logic from `src/commands/logs.js:36-99` verbatim, but instead of `pickPod(ctx, ns)` use `pickResourceInstance(resource, ctx, ns)`. The `logs` verb is only registered on Pods today (but adding it to a registry-listed `resource` is a 6-7 concern; 6-3 just ships the implementation).
+  - [x] `logs.displayName = "Stream logs"`, `logsPrevious.displayName = "Previous container logs"`, `logsToFile.displayName = "Dump logs to file"`.
 
-- [ ] **Task 3: Implement `exec`, `execOneOff`** (AC: #8, #9)
-  - [ ] Port from `src/commands/exec.js`. Names: `"Shell into pod"`, `"Run one-off command"`.
+- [x] **Task 3: Implement `exec`, `execOneOff`** (AC: #8, #9)
+  - [x] Port from `src/commands/exec.js`. Names: `"Shell into pod"`, `"Run one-off command"`.
 
-- [ ] **Task 4: Implement `scale`** (AC: #10)
-  - [ ] After pick: `const replicas = await input({ message: "Replicas:", default: "1" });`.
-  - [ ] If `parseInt(replicas, 10) === 0`, prompt `confirm({ message: \`Scale ${kind}/${name} to 0?\`, default: false })`. If declined, return.
-  - [ ] Run `kubectl ${baseArgs} scale ${kind}/${name} --replicas=${replicas}`.
-  - [ ] `displayName = "Scale"`.
+- [x] **Task 4: Implement `scale`** (AC: #10)
+  - [x] After pick: `const replicas = await input({ message: "Replicas:", default: "1" });`.
+  - [x] If `parseInt(replicas, 10) === 0`, prompt `confirm({ message: \`Scale ${kind}/${name} to 0?\`, default: false })`. If declined, return.
+  - [x] Run `kubectl ${baseArgs} scale ${kind}/${name} --replicas=${replicas}`.
+  - [x] `displayName = "Scale"`.
 
-- [ ] **Task 5: Implement six `rollout*` verbs** (AC: #11)
-  - [ ] Helper `function makeRollout(sub, displayName, { requiresConfirm = false } = {})` returns `{ displayName, handler: async (resource, ctx, ns) => { ... } }`. The handler picks an instance, optionally confirms, then `runLive("kubectl", [...baseArgs, "rollout", sub, \`${resource.kind}/${name}\`])`.
-  - [ ] `rolloutStatus.displayName = "Rollout status"`, `rolloutHistory = "Rollout history"`, `rolloutUndo = "Rollback rollout"` (confirm), `rolloutRestart = "Restart rollout"` (confirm), `rolloutPause = "Pause rollout"`, `rolloutResume = "Resume rollout"`.
+- [x] **Task 5: Implement six `rollout*` verbs** (AC: #11)
+  - [x] Helper `function makeRollout(sub, displayName, { requiresConfirm = false } = {})` returns `{ displayName, handler: async (resource, ctx, ns) => { ... } }`. The handler picks an instance, optionally confirms, then `runLive("kubectl", [...baseArgs, "rollout", sub, \`${resource.kind}/${name}\`])`.
+  - [x] `rolloutStatus.displayName = "Rollout status"`, `rolloutHistory = "Rollout history"`, `rolloutUndo = "Rollback rollout"` (confirm), `rolloutRestart = "Restart rollout"` (confirm), `rolloutPause = "Pause rollout"`, `rolloutResume = "Resume rollout"`.
 
-- [ ] **Task 6: Implement `setImage`, `setEnv`** (AC: #12, #13)
-  - [ ] `setImage.displayName = "Set image"`. Prompt `input({ message: "container=image (e.g. app=nginx:1.27):" })`. Validate format with a simple regex `/^[\w.-]+=.+/`; if invalid, `warn` and return.
-  - [ ] Confirm `Apply new image to ${kind}/${name}?`. If true, `runLive("kubectl", [...baseArgs, "set", "image", \`${resource.kind}/${name}\`, spec])`.
-  - [ ] `setEnv.displayName = "Set env var"`. Prompt `input({ message: "KEY=VALUE:" })`. Same regex check. No confirm. `runLive("kubectl", [...baseArgs, "set", "env", \`${resource.kind}/${name}\`, spec])`.
+- [x] **Task 6: Implement `setImage`, `setEnv`** (AC: #12, #13)
+  - [x] `setImage.displayName = "Set image"`. Prompt `input({ message: "container=image (e.g. app=nginx:1.27):" })`. Validate format with a simple regex `/^[\w.-]+=.+/`; if invalid, `warn` and return.
+  - [x] Confirm `Apply new image to ${kind}/${name}?`. If true, `runLive("kubectl", [...baseArgs, "set", "image", \`${resource.kind}/${name}\`, spec])`.
+  - [x] `setEnv.displayName = "Set env var"`. Prompt `input({ message: "KEY=VALUE:" })`. Same regex check. No confirm. `runLive("kubectl", [...baseArgs, "set", "env", \`${resource.kind}/${name}\`, spec])`.
 
-- [ ] **Task 7: Implement `top`** (AC: #14)
-  - [ ] `displayName = "Top"`. `runLiveWithOptionalWatch("kubectl", [...baseArgs, "top", resource.plural])`. The `baseArgs` helper already strips `--namespace` for cluster-scoped resources, so `top nodes` and `top pods` Just Work.
+- [x] **Task 7: Implement `top`** (AC: #14)
+  - [x] `displayName = "Top"`. `runLiveWithOptionalWatch("kubectl", [...baseArgs, "top", resource.plural])`. The `baseArgs` helper already strips `--namespace` for cluster-scoped resources, so `top nodes` and `top pods` Just Work.
 
-- [ ] **Task 8: Implement `portForward`** (AC: #15)
-  - [ ] `displayName = "Port-forward"`. Pick → prompt `input({ message: "localPort:remotePort:", default: "8080:80" })` → `runLivePipedWithExitKeys("kubectl", [...baseArgs, "port-forward", \`${resource.kind}/${name}\`, ports])`.
+- [x] **Task 8: Implement `portForward`** (AC: #15)
+  - [x] `displayName = "Port-forward"`. Pick → prompt `input({ message: "localPort:remotePort:", default: "8080:80" })` → `runLivePipedWithExitKeys("kubectl", [...baseArgs, "port-forward", \`${resource.kind}/${name}\`, ports])`.
 
-- [ ] **Task 9: Author `src/lib/specificVerbs.test.js`** (AC: #16)
-  - [ ] Mock `./universalVerbs.js` (default `pickResourceInstance` to return `"web-1"`; override per-test for null-path coverage).
-  - [ ] Mock `./runner.js`, `./shell.js`, `@inquirer/prompts`.
-  - [ ] Cover at minimum: `logs`, `scale` (happy + zero-replicas-decline), `rolloutUndo` (confirm-false + confirm-true), `setImage` (happy + invalid input rejected).
-  - [ ] Two fixture resources: `podsResource` and `deploymentResource`. Both `namespaced: true`. Use them as args to the handlers.
+- [x] **Task 9: Author `src/lib/specificVerbs.test.js`** (AC: #16)
+  - [x] Mock `./universalVerbs.js` (default `pickResourceInstance` to return `"web-1"`; override per-test for null-path coverage).
+  - [x] Mock `./runner.js`, `./shell.js`, `@inquirer/prompts`.
+  - [x] Cover at minimum: `logs`, `scale` (happy + zero-replicas-decline), `rolloutUndo` (confirm-false + confirm-true), `setImage` (happy + invalid input rejected).
+  - [x] Two fixture resources: `podsResource` and `deploymentResource`. Both `namespaced: true`. Use them as args to the handlers.
 
-- [ ] **Task 10: Verify no regressions**
-  - [ ] `npm test` — should be ≥333 + new tests.
-  - [ ] No changes to `src/commands/*` or `src/main.js`.
+- [x] **Task 10: Verify no regressions**
+  - [x] `npm test` — should be ≥333 + new tests.
+  - [x] No changes to `src/commands/*` or `src/main.js`.
 
 ## Dev Notes
 
@@ -137,10 +137,10 @@ src/lib/
 
 ### Definition of Done
 
-- [ ] All 16 verbs present in `SPECIFIC_VERBS`.
-- [ ] `pickResourceInstance` early-return path tested for at least 2 representative verbs.
-- [ ] `npm test` passes.
-- [ ] No `src/commands/*` changes (those happen in 6-6).
+- [x] All 16 verbs present in `SPECIFIC_VERBS`.
+- [x] `pickResourceInstance` early-return path tested for at least 2 representative verbs.
+- [x] `npm test` passes.
+- [x] No `src/commands/*` changes (those happen in 6-6).
 
 ### References
 
@@ -155,8 +155,33 @@ src/lib/
 
 ### Agent Model Used
 
+claude-opus-4-7 (1M context)
+
 ### Debug Log References
+
+- One TDD micro-fail: the `logsToFile` test hit a `runShell` mock that returned `undefined` (because `vi.resetAllMocks()` in `beforeEach` wipes return values). Fix: per-test `runShell.mockResolvedValueOnce(0)`. Single-line correction, re-ran green.
 
 ### Completion Notes List
 
+- **All 16 verbs from AC #2 are present.** Tested with 35 specificVerbs cases — covers AC #16's four representative verbs (logs/scale/rolloutUndo/setImage) plus the rest. The `it.each` parametric block covers the `pickResourceInstance → null` early-return path for 11 of the verbs in one block (only `rolloutPause`/`rolloutResume` skip it since they're benign).
+- **`makeRollout(sub, displayName, { requiresConfirm })` factory** generates 6 of the 16 verb entries from one helper — keeps the file at 233 lines (target was <250).
+- **Argument-order convention preserved.** `[--context, --namespace?, verb, kind/name, ...flags]` matches `src/commands/deployments.js:46-51` so status-bar "last command" display stays consistent across migrated and pre-migration paths.
+- **`makeRollout` confirm wording** uses the displayName interpolated into a `${displayName} ${kind}/${name} in "{ns}"?` sentence. Slightly different from the existing per-module wording (e.g. `Roll back "{name}" in "{ns}"?`), but more uniform across the 6 verbs. Behaviourally identical (still `default: false`).
+- **`APP_NAME` import retained as `void APP_NAME`** for now. The story spec mentioned future selector-based logs tailing (e.g. `--selector=app=${APP_NAME}`); not in the AC for 6-3 but the import declaration documents the future hook. Drop in a follow-up if it doesn't materialize.
+- **`logsToFile` keeps `mkdir -p ./logs` inline** in the shell command rather than a separate `run()` call — single shell invocation per the existing logs.js pattern (line 81 issues `mkdir` separately; this version combines them for atomicity).
+- **`setImage` validation regex `/^[\w.-]+=.+/`** matches container=image (and KEY=VALUE for `setEnv`). It will accept some malformed inputs (e.g. `=value` with empty key), but `kubectl set image/env` rejects those server-side. Tight regex would be brittle; trust kubectl.
+- **`exec` uses `runLive(..., { interactive: true })`** to match the existing exec.js behaviour (interactive shell streams, doesn't capture/page). Verified the test asserts the interactive flag.
+- **File sizes:** `src/lib/specificVerbs.js` is 233 lines, `src/lib/specificVerbs.test.js` is 349 lines.
+- **Regression scope:** only the two new files plus `sprint-status.yaml` touched. No `src/commands/*` or `src/main.js` changes.
+- **Test count delta:** 367 → 402 (+35).
+
 ### File List
+
+- `src/lib/specificVerbs.js` (NEW)
+- `src/lib/specificVerbs.test.js` (NEW)
+- `.product_design/implementation-artifacts/6-3-specific-verbs-pod-workload-specific-verbs.md` (this file)
+- `.product_design/implementation-artifacts/sprint-status.yaml` (status: in-progress → review)
+
+### Change Log
+
+- 2026-05-26 — Initial implementation: `SPECIFIC_VERBS` map with 16 verb entries (logs/exec/scale/6× rollout/setImage/setEnv/top/portForward), `makeRollout` factory, baseArgs/targetRef helpers, 35 vitest cases. Status → review.

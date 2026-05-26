@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.12.2 — 2026-05-26
+
+- **Splash redesign.** Letter faces now run a four-tier shading gradient — solid white `█` (sparse) → light-blue ▒ (lightest blue, 256-colour 153) → ▓ (lighter blue, 117) → solid █ (light blue, 75). Depth/edge glyphs (`╗ ║ ╚ ═` etc.) shift from dark steel to the same light blue 75 so the dense face fuses with the shadow. The "By Ono Sendai Runner" byline is bright white.
+- **Gradient revolves.** The shading axis rotates once every 8 seconds (80ms frames) while the splash is on screen, so the four bands sweep around the letter faces. First frame fires via `setImmediate` so motion is visible immediately. Animation stops automatically on `hideSplash()` / `destroyChrome()`. Cursor is saved/restored each frame so prereq prints below the splash aren't disturbed.
+- **Splash holds for ~2 seconds** after startup checks complete so the title actually has a moment to be seen.
+- **`checkPrerequisites()` is async** — yields the event loop between each kubectl/helm/az probe via `await new Promise(r => setImmediate(r))`, so the gradient keeps revolving through the (sync `execSync`) prereq checks rather than freezing.
+- **No more one-row bump.** Cursor now parks immediately below the art (not anchored to `rows() - 3`), so `console.log("✓ X found")` newlines can't push past the scroll-region bottom and trigger a scroll that shifts the splash. Animation tick also defensively wipes two rows above the splash to clean up any stray remnants.
+
 ## v1.12.1 — 2026-05-26
 
 - `exec` and `execOneOff` verb labels now render green (interactive-into-the-container, distinct from blue read-only `logs*`).

@@ -32,8 +32,20 @@ const C_DIV      = "\x1b[38;5;239m";          // divider lines: dark grey
 const C_RESET    = "\x1b[0m";                 // full attribute reset
 const C_PROG_ON  = "\x1b[38;5;51m";           // progress bar: moving block (bright cyan)
 const C_PROG_OFF = "\x1b[38;5;60m";           // progress bar: track (muted slate)
-const C_ART_FRONT  = "\x1b[1;38;5;51m";       // splash art: solid letter faces (bright cyan)
-const C_ART_SHADOW = "\x1b[38;5;24m";         // splash art: 3D shadow edges (dark steel)
+const C_ART_FRONT  = "\x1b[1;97m";            // splash art: byline (flat bold bright white)
+const C_ART_SHADOW = "\x1b[38;5;75m";         // splash art: bottom-right depth/edges (light blue)
+
+// Letter-face gradient — four tiers stepping from white into progressively saturated blue.
+// Sparse band uses a full block (not ░) so it renders as a solid white face, not a dotted
+// pattern that lets background through and reads as grey.
+// The solid █ uses the same 75 as C_ART_SHADOW so the dense face fuses with the depth.
+const GRADIENT_BANDS = [
+    { glyph: "█", color: "\x1b[1;97m" },          // sparse  → solid white
+    { glyph: "▒", color: "\x1b[1;38;5;153m" },    // medium  → lightest blue (LightSkyBlue1)
+    { glyph: "▓", color: "\x1b[1;38;5;117m" },    // dark    → lighter blue (SkyBlue1)
+    { glyph: "█", color: "\x1b[1;38;5;75m" },     // solid   → light blue (SteelBlue1, matches depth)
+];
+const SPLASH_LAST_ART_ROW = 5; // rows 0..5 are art; row 6 is the byline (handled separately)
 const AUTH_SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]; // auth-check spinner
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -58,6 +70,10 @@ let _exitHandler = null;
 let _resizeTimer = null;
 let _lastRows = 0;
 let _splashVisible = false;
+let _splashAnimTimer = null;
+let _splashAnimAngle = Math.PI / 4; // start at the static-look diagonal (top-left → bottom-right)
+const SPLASH_ANIM_INTERVAL_MS = 80;
+const SPLASH_ANIM_ANGULAR_VELOCITY = (2 * Math.PI) / (8000 / SPLASH_ANIM_INTERVAL_MS); // full revolution per 8s
 let _stepHeaderRows = 0; // rows consumed by the active step()'s title block; lets prompts pin below it
 const _resizeSubscribers = new Set();
 
@@ -332,6 +348,8 @@ export function destroyChrome() {
     searchText = "";
     if (_authSpinnerTimer) { clearInterval(_authSpinnerTimer); _authSpinnerTimer = null; }
     if (_progressTimer) { clearInterval(_progressTimer); _progressTimer = null; }
+    if (_splashAnimTimer) { clearInterval(_splashAnimTimer); _splashAnimTimer = null; }
+    _splashVisible = false;
     _progressActive = false;
     if (_resizeTimer) { clearTimeout(_resizeTimer); _resizeTimer = null; }
     _resizeSubscribers.clear();
@@ -419,52 +437,136 @@ export function setLastCommandRun(text) {
     _relayoutHeader();
 }
 
-// Two-tones an ANSI-Shadow art line: solid █ faces in the front colour, the
-// box-drawing depth/edge glyphs in the darker shadow colour, spaces left bare.
-function _colorizeArtLine(line) {
+// Map a normalized position t ∈ [0,1] to one of the four gradient bands ({glyph, color}).
+// Bands are slightly biased toward solid █ so the leading edge reads as a clean block.
+function _gradientBand(t) {
+    if (t < 0.3)  return GRADIENT_BANDS[0]; // ░ + bright white   — sparse end
+    if (t < 0.55) return GRADIENT_BANDS[1]; // ▒ + pale blue
+    if (t < 0.8)  return GRADIENT_BANDS[2]; // ▓ + light periwinkle
+    return GRADIENT_BANDS[3];                // █ + light blue      — solid end
+}
+
+// Projects (col, row) onto a rotating axis whose angle is _splashAnimAngle.
+// t=0 at the trailing edge, t=1 at the leading edge — so as the angle revolves,
+// the sparse→solid wash sweeps around the splash.
+function _gradientT(row, col) {
+    const xc = (col / (SPLASH_ART_WIDTH - 1)) - 0.5;
+    const yc = (row / SPLASH_LAST_ART_ROW) - 0.5;
+    const cosA = Math.cos(_splashAnimAngle);
+    const sinA = Math.sin(_splashAnimAngle);
+    const proj = xc * cosA + yc * sinA;
+    const maxAbs = 0.5 * (Math.abs(cosA) + Math.abs(sinA));
+    if (maxAbs === 0) return 0.5; // degenerate guard
+    return (proj + maxAbs) / (2 * maxAbs);
+}
+
+// Colourises an ANSI-Shadow art line:
+//   - solid █ faces are SWAPPED for a graded block (░/▒/▓/█) based on the cell's
+//     diagonal position across the whole splash, producing a wash from top-left
+//     (sparse) to bottom-right (full) — all rendered in white
+//   - box-drawing depth/edge glyphs (╗ ║ ╔ ╚ ═ ╝ ─ etc.) render in light blue
+//   - spaces reset to default so the chrome background shows through
+function _colorizeArtLine(line, row) {
     let out = "";
-    let mode = "";
+    let lastEscape = "";
+    let col = 0;
     for (const ch of line) {
-        const next = ch === "█" ? "front" : ch === " " ? "space" : "shadow";
-        if (next !== mode) {
-            out += next === "front" ? C_ART_FRONT : next === "shadow" ? C_ART_SHADOW : C_RESET;
-            mode = next;
+        let escape;
+        let glyph = ch;
+        if (ch === "█") {
+            const band = _gradientBand(_gradientT(row, col));
+            escape = band.color;
+            glyph = band.glyph;
+        } else if (ch === " ") {
+            escape = C_RESET;
+        } else {
+            escape = C_ART_SHADOW;
         }
-        out += ch;
+        if (escape !== lastEscape) {
+            out += escape;
+            lastEscape = escape;
+        }
+        out += glyph;
+        col++;
     }
     return out + C_RESET;
 }
 
-// Draws the splash art centred in the content area. Returns the row just below the
-// art, or null when the terminal is too short or too narrow to render it cleanly
-// (skipping avoids the 65-column art wrapping into a garbled block on narrow widths).
-function _drawSplashArt() {
+// Computes where the splash art will sit in the current terminal — vStart row, height,
+// padding. Returns null when the terminal is too small to render it cleanly.
+function _splashLayout() {
     const contentStart = _contentStart();
     const contentHeight = (rows() - 1) - contentStart + 1;
     const artHeight = SPLASH_ART.length;
     if (contentHeight < artHeight || cols() < SPLASH_ART_WIDTH) return null;
     const hPad = Math.floor((cols() - SPLASH_ART_WIDTH) / 2);
     const vStart = contentStart + Math.floor((contentHeight - artHeight) / 2);
+    return { vStart, artHeight, hPad };
+}
+
+// Draws the splash art centred in the content area. Returns the row just below the
+// art, or null when the terminal is too short or too narrow to render it cleanly
+// (skipping avoids the 65-column art wrapping into a garbled block on narrow widths).
+function _drawSplashArt() {
+    const layout = _splashLayout();
+    if (!layout) return null;
+    const { vStart, artHeight, hPad } = layout;
     const prefix = " ".repeat(hPad);
     for (let i = 0; i < artHeight; i++) {
         const line = SPLASH_ART[i];
-        // Only the byline is plain text (front colour); every block/shadow row — including
-        // the all-edge bottom drop-shadow row — is two-toned by the colouriser.
-        const body = /[A-Za-z]/.test(line) ? C_ART_FRONT + line + C_RESET : _colorizeArtLine(line);
+        // Only the byline is plain text (flat front colour, no gradient); every block/shadow row
+        // — including the all-edge bottom drop-shadow row — runs through the colouriser.
+        const body = /[A-Za-z]/.test(line) ? C_ART_FRONT + line + C_RESET : _colorizeArtLine(line, i);
         moveTo(vStart + i, 1);
         w("\x1b[2K" + prefix + body);
     }
     return vStart + artHeight;
 }
 
+// Redraws the splash art in place without moving the cursor — used by the animation
+// timer so the gradient angle update doesn't bump prereq prints that are happening
+// below the art. Save/restore cursor brackets the redraw. Also wipes a couple of rows
+// just above the splash so any stale content from an accidental scroll (e.g. console.log
+// at the bottom of the scroll region) gets cleaned up on the next tick.
+function _animateSplashFrame() {
+    if (!active || !_splashVisible) return;
+    _splashAnimAngle = (_splashAnimAngle + SPLASH_ANIM_ANGULAR_VELOCITY) % (2 * Math.PI);
+    const layout = _splashLayout();
+    w("\x1b[s");
+    if (layout) {
+        // Scrub up to two rows above the splash to wipe any leftover row pushed up by a scroll.
+        const top = Math.max(_contentStart(), layout.vStart - 2);
+        for (let r = top; r < layout.vStart; r++) {
+            moveTo(r, 1);
+            w("\x1b[2K");
+        }
+    }
+    _drawSplashArt();
+    w("\x1b[u");
+}
+
 export function drawSplash() {
     if (!active) return;
     _splashVisible = true;
     const belowArt = _drawSplashArt();
-    moveTo(Math.max((belowArt ?? _contentStart()) + 1, rows() - 3), 1);
+    // Position cursor immediately below the splash (NOT anchored to rows()-3): keeps prereq
+    // prints clustered with the art and, crucially, leaves a buffer of empty rows between
+    // the prereq output and the scroll region bottom so console.log("…\n") can't trigger
+    // a scroll that would shift the splash up.
+    moveTo((belowArt ?? _contentStart()) + 1, 1);
+    if (!_splashAnimTimer) {
+        _splashAnimTimer = setInterval(_animateSplashFrame, SPLASH_ANIM_INTERVAL_MS);
+        // Kick the first animated frame as soon as the event loop has a moment — otherwise
+        // we'd wait a full SPLASH_ANIM_INTERVAL_MS before any motion is visible.
+        setImmediate(_animateSplashFrame);
+    }
 }
 
-export function hideSplash() { _splashVisible = false; _stepHeaderRows = 0; }
+export function hideSplash() {
+    _splashVisible = false;
+    _stepHeaderRows = 0;
+    if (_splashAnimTimer) { clearInterval(_splashAnimTimer); _splashAnimTimer = null; }
+}
 
 export function getStepHeaderRows() { return _stepHeaderRows; }
 

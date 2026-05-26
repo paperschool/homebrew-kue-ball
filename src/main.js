@@ -143,8 +143,12 @@ async function pickNamespace(ctx) {
     });
 }
 
-function checkPrerequisites() {
-    const probe = (label, available, getVersion) => {
+// Async so each probe yields the event loop before running execSync. That gives the splash
+// animation timer (chrome.js setInterval) a chance to fire between probes — otherwise the
+// sync shell calls would block the loop for the whole prereq check and freeze the gradient.
+async function checkPrerequisites() {
+    const probe = async (label, available, getVersion) => {
+        await new Promise((resolve) => setImmediate(resolve));
         process.stdout.write(`  ${DIM}Checking for ${label}…${RESET}`);
         const found = available();
         const version = found ? getVersion() : null;
@@ -153,7 +157,7 @@ function checkPrerequisites() {
     };
     const label = (name, version) => version ? `${name} found  ${DIM}(${version})${RESET}` : `${name} found`;
 
-    const kubectl = probe("kubectl", isKubectlAvailable, getKubectlVersion);
+    const kubectl = await probe("kubectl", isKubectlAvailable, getKubectlVersion);
     if (!kubectl.found) {
         process.stderr.write(`  ${RED}✗ kubectl not found.${RESET}\n`);
         process.stderr.write(`  ${DIM}  Install it via: brew install kubectl${RESET}\n\n`);
@@ -161,11 +165,11 @@ function checkPrerequisites() {
     }
     ok(label("kubectl", kubectl.version));
 
-    const helm = probe("helm", isHelmAvailable, getHelmVersion);
+    const helm = await probe("helm", isHelmAvailable, getHelmVersion);
     if (helm.found) ok(label("helm", helm.version));
     else warn("helm not found — Helm commands won't work (brew install helm).");
 
-    const az = probe("az CLI", isAzCliAvailable, getAzVersion);
+    const az = await probe("az CLI", isAzCliAvailable, getAzVersion);
     if (az.found) ok(label("az CLI", az.version));
     else warn("az CLI not found — refreshing contexts from Azure is unavailable (brew install azure-cli).");
 
@@ -227,7 +231,9 @@ async function main() {
     startAuthPoller((status) => setAuthStatus(status));
     process.on("exit", stopAuthPoller);
     drawSplash();
-    const { azAvailable } = checkPrerequisites();
+    const { azAvailable } = await checkPrerequisites();
+    // Hold the splash for a beat so the user actually sees it after the prereq lines settle.
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     if (azAvailable) {
         setLastCommand(`Refresh contexts  ${DIM}(az aks get-credentials)${RESET}`);
         step("Refresh kubeconfig from Azure?", "Pull fresh AKS credentials and merge them into your kubeconfig.");

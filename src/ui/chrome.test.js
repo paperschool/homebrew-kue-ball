@@ -531,18 +531,25 @@ describe("chrome", () => {
             expect(writeSpy).not.toHaveBeenCalled();
         });
 
-        it("writes two-tone art (bright faces + shadow edges) with the KUE-BALL blocks", () => {
+        it("writes a white→blue gradient face (░→█) with light-blue depth edges for the KUE-BALL blocks", () => {
             chrome.initChrome();
             writeSpy.mockClear();
             chrome.drawSplash();
             const written = allWritten();
-            expect(written).toContain("\x1b[1;38;5;51m"); // front (face) colour
-            expect(written).toContain("\x1b[38;5;24m");   // shadow (edge) colour
-            expect(strippedWritten()).toContain("██╗  ██╗");
-            expect(strippedWritten()).toContain("███████╗");
-            // the all-edge bottom drop-shadow row must use the shadow colour, not the face colour
-            expect(written).not.toContain("\x1b[1;38;5;51m╚");
-            expect(written).toContain("\x1b[38;5;24m╚");
+            const stripped = strippedWritten();
+            // The gradient walks white → lightest blue → lighter blue → light blue (solid).
+            expect(written).toContain("\x1b[1;97m");        // bright white (░ band + byline)
+            expect(written).toContain("\x1b[1;38;5;153m");  // lightest blue (▒ band)
+            expect(written).toContain("\x1b[1;38;5;117m");  // lighter blue (▓ band)
+            expect(written).toContain("\x1b[1;38;5;75m");   // light blue (█ band, matches depth)
+            expect(written).toContain("\x1b[38;5;75m");     // light-blue depth/shadow edges
+            // Glyph bands: sparse uses solid █ in white, middle bands use ▒/▓, solid uses █ in blue.
+            expect(stripped).toContain("▒");
+            expect(stripped).toContain("▓");
+            expect(stripped).toContain("███████╗");          // solid blocks near bottom-right preserved
+            // All-edge bottom drop-shadow row uses the shadow colour, never the face colour.
+            expect(written).not.toContain("\x1b[1;97m╚");
+            expect(written).toContain("\x1b[38;5;75m╚");
         });
 
         it("positions cursor after the art block", () => {
@@ -686,7 +693,9 @@ describe("chrome", () => {
             vi.advanceTimersByTime(100);
             // 40 rows → contentHeight 34, vStart = 6 + floor((34-7)/2) = 19
             expect(writtenWith("\x1b[19;1H")).toBe(true);
-            expect(strippedWritten().includes("██╗  ██╗")).toBe(true);
+            // Bottom-right of the gradient is always solid █; the all-edge bottom row is unchanged
+            // (it carries no █). Either substring proves the splash was redrawn.
+            expect(strippedWritten().includes("╚══════╝")).toBe(true);
         });
 
         it("stops redrawing the splash art on resize once hideSplash() is called", () => {
@@ -696,7 +705,7 @@ describe("chrome", () => {
             writeSpy.mockClear();
             process.stdout.emit("resize");
             vi.advanceTimersByTime(100);
-            expect(strippedWritten().includes("██╗  ██╗")).toBe(false);
+            expect(strippedWritten().includes("╚══════╝")).toBe(false);
         });
     });
 });

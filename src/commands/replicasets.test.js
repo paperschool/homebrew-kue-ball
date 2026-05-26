@@ -73,7 +73,7 @@ describe("Describe a replica set", () => {
             "describe",
             "replicaset",
             "web-abc123",
-        ]);
+        ], expect.objectContaining({ onEdit: expect.any(Function) }));
     });
 
     it("warns and does nothing when there are no replica sets", async () => {

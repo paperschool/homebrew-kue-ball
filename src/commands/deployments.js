@@ -1,5 +1,5 @@
 import { runLive, runLiveWithOptionalWatch } from "../lib/runner.js";
-import { run } from "../lib/shell.js";
+import { run, spawnInteractive } from "../lib/shell.js";
 import { warn, DIM, RESET } from "../lib/output.js";
 import { APP_NAME } from "../lib/env.js";
 import { select, confirm } from "@inquirer/prompts";
@@ -31,7 +31,13 @@ export function buildDeploymentsCommands(ctx, ns) {
                             "describe",
                             "deployment",
                             appDeployment,
-                        ]),
+                        ], {
+                            onEdit: () => spawnInteractive("kubectl", [
+                                "edit", "deployment", appDeployment,
+                                `--namespace=${ns}`,
+                                `--context=${ctx}`,
+                            ], { env: { ...process.env, KUBE_EDITOR: process.env.KUBE_EDITOR ?? "nano" } }),
+                        }),
                 },
                 {
                     group: "Deployments",

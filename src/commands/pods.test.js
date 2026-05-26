@@ -96,7 +96,7 @@ describe("Describe a pod command", () => {
             "describe",
             "pod",
             "my-pod",
-        ]);
+        ], expect.objectContaining({ onEdit: expect.any(Function) }));
     });
 });
 

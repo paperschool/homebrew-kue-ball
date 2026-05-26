@@ -49,7 +49,7 @@ export function filterLines(lines, query) {
 // Shows command output in the content area. If it fits (or stdin is not a TTY) it is
 // printed normally; otherwise it becomes a scrollable viewport — with vertical/horizontal
 // scroll, resize reflow, and a `/` grep filter — that keeps the chrome header/footer visible.
-export function pageOutput(text) {
+export function pageOutput(text, { onEdit } = {}) {
     const lines = (text ?? "").replace(/\n+$/, "").split("\n");
     const maxLineLen = lines.reduce((longest, line) => Math.max(longest, line.length), 0);
 
@@ -118,7 +118,8 @@ export function pageOutput(text) {
                     : `${scroll + 1}-${Math.min(scroll + bodyH, body.length)}/${body.length}`;
                 const pan = maxHScroll ? " · ←→ pan" : "";
                 const filt = query ? ` · filter:${query}` : "";
-                w("\x1b[2K" + DIM + `  ↑↓ scroll${pan} · / filter · q return   ${pos}${filt}` + RESET);
+                const edit = onEdit ? " · e edit" : "";
+                w("\x1b[2K" + DIM + `  ↑↓ scroll${pan} · / filter${edit} · q return   ${pos}${filt}` + RESET);
             }
             w("\x1b[u");
         };
@@ -127,7 +128,7 @@ export function pageOutput(text) {
         const unsubscribeResize = chromeActive() ? onChromeResize(onResize) : () => {};
 
         const wasRaw = process.stdin.isRaw === true;
-        const cleanup = () => {
+        const cleanup = async (editMode = false) => {
             unsubscribeResize();
             process.stdin.off("data", onData);
             if (!wasRaw && process.stdin.setRawMode) process.stdin.setRawMode(false);
@@ -135,6 +136,7 @@ export function pageOutput(text) {
             w("\x1b[?7h"); // restore line wrap
             for (let r = top; r <= top + viewportH; r++) { moveTo(r); w("\x1b[2K"); }
             moveTo(top);
+            if (editMode && onEdit) await onEdit();
             resolve();
         };
 
@@ -154,6 +156,7 @@ export function pageOutput(text) {
             if (key === "/") { mode = "filter"; render(); return; }
             if (key === "\x1b" && query) { query = ""; refilter(); recompute(); render(); return; } // Esc clears active filter
             if (isQuitKey(key)) { cleanup(); return; }
+            if (onEdit && key === "e") { cleanup(true); return; }
             const nextScroll = scrollFor(key, scroll, bodyH, maxScroll);
             const nextHscroll = hScrollFor(key, hscroll, hStep, maxHScroll);
             if (nextScroll !== scroll || nextHscroll !== hscroll) {

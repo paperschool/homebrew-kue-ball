@@ -1,5 +1,5 @@
 import { runLive, runLiveWithOptionalWatch } from "../lib/runner.js";
-import { run } from "../lib/shell.js";
+import { run, spawnInteractive } from "../lib/shell.js";
 import { warn, DIM, RESET } from "../lib/output.js";
 import { select, confirm, input } from "@inquirer/prompts";
 
@@ -46,7 +46,13 @@ export function buildReplicaSetsCommands(ctx, ns) {
             run: async () => {
                 const rs = await pickReplicaSet(ctx, ns, "Describe replica set:");
                 if (!rs) return;
-                await runLive("kubectl", [`--context=${ctx}`, `--namespace=${ns}`, "describe", "replicaset", rs]);
+                await runLive("kubectl", [`--context=${ctx}`, `--namespace=${ns}`, "describe", "replicaset", rs], {
+                    onEdit: () => spawnInteractive("kubectl", [
+                        "edit", "replicaset", rs,
+                        `--namespace=${ns}`,
+                        `--context=${ctx}`,
+                    ], { env: { ...process.env, KUBE_EDITOR: process.env.KUBE_EDITOR ?? "nano" } }),
+                });
             },
         },
         {

@@ -1,4 +1,5 @@
 import { runLive, runLiveWithOptionalWatch } from "../lib/runner.js";
+import { spawnInteractive } from "../lib/shell.js";
 import { pickPod } from "../lib/kubectl.js";
 import { confirm } from "@inquirer/prompts";
 import { DIM, RESET } from "../lib/output.js";
@@ -43,7 +44,13 @@ export function buildPodsCommands(ctx, ns) {
                     "describe",
                     "pod",
                     pod,
-                ]);
+                ], {
+                    onEdit: () => spawnInteractive("kubectl", [
+                        "edit", "pod", pod,
+                        `--namespace=${ns}`,
+                        `--context=${ctx}`,
+                    ], { env: { ...process.env, KUBE_EDITOR: process.env.KUBE_EDITOR ?? "nano" } }),
+                });
             },
         },
         {

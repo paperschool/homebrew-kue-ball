@@ -105,7 +105,8 @@ describe("Describe a ConfigMap", () => {
     await cmd.run();
     expect(runLive).toHaveBeenCalledWith(
       "kubectl",
-      expect.arrayContaining(["describe", "configmap", "my-cm"])
+      expect.arrayContaining(["describe", "configmap", "my-cm"]),
+      expect.objectContaining({ onEdit: expect.any(Function) })
     );
   });
 });

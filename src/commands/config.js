@@ -1,5 +1,5 @@
 import { runLive, runLiveWithOptionalWatch, runShell } from "../lib/runner.js";
-import { run } from "../lib/shell.js";
+import { run, spawnInteractive } from "../lib/shell.js";
 import { warn, DIM, RESET } from "../lib/output.js";
 import { select } from "@inquirer/prompts";
 
@@ -67,7 +67,13 @@ export function buildConfigCommands(ctx, ns) {
             "describe",
             "configmap",
             chosen,
-          ]);
+          ], {
+            onEdit: () => spawnInteractive("kubectl", [
+              "edit", "configmap", chosen,
+              `--namespace=${ns}`,
+              `--context=${ctx}`,
+            ], { env: { ...process.env, KUBE_EDITOR: process.env.KUBE_EDITOR ?? "nano" } }),
+          });
         }
       },
     },

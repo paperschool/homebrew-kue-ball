@@ -48,9 +48,9 @@ export function captureCommand(cmd, args, timeoutMs = 60_000) {
     });
 }
 
-export function spawnInteractive(cmd, args) {
+export function spawnInteractive(cmd, args, { env } = {}) {
     return new Promise((resolve) => {
-        const proc = spawn(cmd, args, { stdio: "inherit" });
+        const proc = spawn(cmd, args, { stdio: "inherit", ...(env && { env }) });
         proc.on("exit", (code) => resolve(code ?? 0));
         proc.on("error", (err) => {
             warn(err.message);

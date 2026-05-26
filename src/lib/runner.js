@@ -21,7 +21,7 @@ async function _spawnWithProgress(spawn) {
 
 // Runs a one-shot command, animating progress while it runs, then shows its output
 // in the scrollable content-area pager. Returns the exit code.
-async function _runCaptured(cmd, args) {
+async function _runCaptured(cmd, args, onEdit) {
     startProgress();
     let result;
     try {
@@ -29,14 +29,14 @@ async function _runCaptured(cmd, args) {
     } finally {
         stopProgress();
     }
-    await pageOutput(result.output);
+    await pageOutput(result.output, { onEdit });
     return result.code;
 }
 
-export async function runLive(cmd, args, { interactive = false } = {}) {
+export async function runLive(cmd, args, { interactive = false, onEdit } = {}) {
     setLastCommandRun([cmd, ...args].join(" "));
     if (interactive) return spawnInteractive(cmd, args); // interactive shell — streams, owns the screen
-    return _runCaptured(cmd, args);
+    return _runCaptured(cmd, args, onEdit);
 }
 
 // Runs a raw `sh -c` pipeline (for commands that build their own shell string),

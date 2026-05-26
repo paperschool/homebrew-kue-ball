@@ -71,7 +71,7 @@ describe("runLive()", () => {
         const code = await runLive("kubectl", ["get", "pods"]);
 
         expect(shell.captureCommand).toHaveBeenCalledWith("kubectl", ["get", "pods"]);
-        expect(pageOutput).toHaveBeenCalledWith("pod-a\npod-b");
+        expect(pageOutput).toHaveBeenCalledWith("pod-a\npod-b", expect.objectContaining({}));
         expect(code).toBe(0);
     });
 
@@ -120,7 +120,7 @@ describe("runShell()", () => {
         const code = await runShell("kubectl get cm | jq .");
 
         expect(shell.captureCommand).toHaveBeenCalledWith("sh", ["-c", "kubectl get cm | jq ."]);
-        expect(pageOutput).toHaveBeenCalledWith("table");
+        expect(pageOutput).toHaveBeenCalledWith("table", expect.objectContaining({}));
         expect(chrome.setLastCommandRun).toHaveBeenCalledWith("kubectl get cm | jq .");
         expect(code).toBe(0);
     });

@@ -58,6 +58,23 @@ export const RESOURCES = [
     { kind: "virtualservice", plural: "virtualservices", displayName: "VirtualServices", group: "Networking", namespaced: true,
       universalVerbs: ["list", "describe", "delete"],
       specificVerbs: [] },
+
+    // why: no delete on Nodes — accidental node deletion against AKS/EKS/GKE doesn't actually remove the VM, just causes confusion
+    { kind: "node",           plural: "nodes",           displayName: "Nodes",           group: "Cluster",    namespaced: false,
+      universalVerbs: ["list", "describe", "edit"],
+      specificVerbs: ["top", "cordon", "uncordon", "drain", "taint"] },
+
+    // why: HPA's plural is horizontalpodautoscalers (long); kind kept as short "hpa" for menu labels
+    { kind: "hpa",            plural: "horizontalpodautoscalers", displayName: "HPA",     group: "Storage",    namespaced: true,
+      universalVerbs: ["list", "describe", "edit", "delete"],
+      specificVerbs: [] },
+    { kind: "pv",             plural: "persistentvolumes",        displayName: "PVs",     group: "Storage",    namespaced: false,
+      universalVerbs: ["list", "describe", "delete"],
+      specificVerbs: [] },
+    // why: most PVC fields are immutable post-bind; kubectl edit silently no-ops most changes
+    { kind: "pvc",            plural: "persistentvolumeclaims",   displayName: "PVCs",    group: "Storage",    namespaced: true,
+      universalVerbs: ["list", "describe", "delete"],
+      specificVerbs: [] },
 ];
 
 const _seen = new Set();

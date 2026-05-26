@@ -10,16 +10,20 @@ describe("resources registry", () => {
         expect(RESOURCES.length).toBeGreaterThan(0);
     });
 
-    it("includes the 13 post-6-7 registered resources", () => {
+    it("includes the 17 post-6-8 registered resources", () => {
         const kinds = RESOURCES.map((r) => r.kind).sort();
         expect(kinds).toEqual([
             "configmap",
             "cronjob",
             "daemonset",
             "deployment",
+            "hpa",
             "ingress",
             "job",
+            "node",
             "pod",
+            "pv",
+            "pvc",
             "replicaset",
             "secret",
             "service",
@@ -71,6 +75,10 @@ describe("resources registry", () => {
             "serviceaccount",
             "service",
             "virtualservice",
+            "node",           // Cluster
+            "hpa",            // Storage alphabetical
+            "pv",
+            "pvc",
         ]);
     });
 
@@ -111,6 +119,39 @@ describe("resources registry", () => {
     it("CronJobs has triggerNow", () => {
         const cj = getResource("cronjob");
         expect(cj.specificVerbs).toEqual(["triggerNow"]);
+    });
+
+    it("Nodes is cluster-scoped, has all node-specific verbs, and OMITS delete", () => {
+        const node = getResource("node");
+        expect(node.namespaced).toBe(false);
+        expect(node.group).toBe("Cluster");
+        expect(node.universalVerbs).not.toContain("delete");
+        expect(node.universalVerbs).toEqual(["list", "describe", "edit"]);
+        expect(node.specificVerbs).toEqual(["top", "cordon", "uncordon", "drain", "taint"]);
+    });
+
+    it("HPA uses the long plural (horizontalpodautoscalers) but short kind (hpa)", () => {
+        const hpa = getResource("hpa");
+        expect(hpa.kind).toBe("hpa");
+        expect(hpa.plural).toBe("horizontalpodautoscalers");
+        expect(hpa.group).toBe("Storage");
+        expect(hpa.namespaced).toBe(true);
+        expect(hpa.universalVerbs).toEqual(["list", "describe", "edit", "delete"]);
+    });
+
+    it("PVC is namespaced and OMITS the edit verb", () => {
+        const pvc = getResource("pvc");
+        expect(pvc.namespaced).toBe(true);
+        expect(pvc.group).toBe("Storage");
+        expect(pvc.universalVerbs).not.toContain("edit");
+        expect(pvc.universalVerbs).toEqual(["list", "describe", "delete"]);
+    });
+
+    it("PV is cluster-scoped", () => {
+        const pv = getResource("pv");
+        expect(pv.namespaced).toBe(false);
+        expect(pv.group).toBe("Storage");
+        expect(pv.universalVerbs).toEqual(["list", "describe", "delete"]);
     });
 
     it("VirtualService is registered as a Networking, namespaced resource with universal verbs only", () => {

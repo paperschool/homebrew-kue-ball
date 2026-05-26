@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.11.0 — 2026-05-26
+
+- Resource registry now exposes **Nodes** under a new "Cluster" group and **HPA / PVC / PV** under "Storage". All four use the existing universal/specific verb handlers; cluster-scoped resources (Nodes, PV) auto-omit `--namespace`.
+- Nodes deliberately omits `delete` (accidentally deleting a node on a managed cluster doesn't decommission the VM and just causes confusion). PVC deliberately omits `edit` (most fields are immutable post-bind).
+- `top nodes` returns — regression from story 6-6's command-module cleanup is now closed.
+
 ## v1.10.0 — 2026-05-26
 
 - Resource registry gains **StatefulSets, DaemonSets, Jobs, CronJobs** under the Workloads group; CronJobs picks up a new `triggerNow` verb (`kubectl create job --from=cronjob/...`).

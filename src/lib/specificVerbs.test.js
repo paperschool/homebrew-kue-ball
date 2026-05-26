@@ -41,6 +41,7 @@ import {
     runLiveWithOptionalWatch,
     runShell,
 } from "./runner.js";
+import { run } from "./shell.js";
 import { pickResourceInstance } from "./universalVerbs.js";
 import { warn, ok } from "./output.js";
 import { select, input, confirm } from "@inquirer/prompts";
@@ -61,6 +62,14 @@ const nodesResource = {
     kind: "node", plural: "nodes", displayName: "Nodes", group: "Cluster",
     namespaced: false, universalVerbs: [], specificVerbs: ["top"],
 };
+const jobResource = {
+    kind: "job", plural: "jobs", displayName: "Jobs", group: "Workloads",
+    namespaced: true, universalVerbs: [], specificVerbs: ["logs"],
+};
+const cronJobResource = {
+    kind: "cronjob", plural: "cronjobs", displayName: "CronJobs", group: "Workloads",
+    namespaced: true, universalVerbs: [], specificVerbs: ["triggerNow"],
+};
 
 beforeEach(() => {
     vi.resetAllMocks();
@@ -68,7 +77,7 @@ beforeEach(() => {
 });
 
 describe("SPECIFIC_VERBS shape", () => {
-    it("contains the 16 expected verb keys", () => {
+    it("contains the 21 expected verb keys (16 from 6-3 + 4 node verbs from 6-4 + triggerNow from 6-7)", () => {
         const expected = [
             "logs", "logsPrevious", "logsToFile", "exec", "execOneOff",
             "scale",
@@ -76,6 +85,8 @@ describe("SPECIFIC_VERBS shape", () => {
             "rolloutRestart", "rolloutPause", "rolloutResume",
             "setImage", "setEnv",
             "top", "portForward",
+            "cordon", "uncordon", "drain", "taint",
+            "triggerNow",
         ];
         for (const key of expected) {
             expect(SPECIFIC_VERBS[key]).toBeDefined();
@@ -102,6 +113,66 @@ describe("logs", () => {
             "web-1",
             "--tail=200",
         ]);
+    });
+});
+
+describe("logs — Job branch", () => {
+    it("for a Job resource, resolves the pod via --selector=job-name and then streams its logs", async () => {
+        pickResourceInstance.mockResolvedValueOnce("nightly-backup");
+        run.mockReturnValueOnce("backup-pod-x9");
+        await SPECIFIC_VERBS.logs.handler(jobResource, CTX, NS);
+        const lookupCmd = run.mock.calls[0][0];
+        expect(lookupCmd).toContain("--selector=job-name=nightly-backup");
+        expect(runLivePipedWithExitKeys).toHaveBeenCalledWith("kubectl", [
+            `--context=${CTX}`,
+            `--namespace=${NS}`,
+            "logs",
+            "-f",
+            "backup-pod-x9",
+            "--tail=200",
+        ]);
+    });
+
+    it("warns and skips when the Job has no pod (empty jsonpath result)", async () => {
+        pickResourceInstance.mockResolvedValueOnce("nightly-backup");
+        run.mockReturnValueOnce(null);
+        await SPECIFIC_VERBS.logs.handler(jobResource, CTX, NS);
+        expect(warn).toHaveBeenCalled();
+        expect(runLivePipedWithExitKeys).not.toHaveBeenCalled();
+    });
+
+    it("warns when invoked on a resource other than Pod or Job", async () => {
+        pickResourceInstance.mockResolvedValueOnce("web-1");
+        await SPECIFIC_VERBS.logs.handler(deploymentResource, CTX, NS);
+        expect(warn).toHaveBeenCalled();
+        expect(runLivePipedWithExitKeys).not.toHaveBeenCalled();
+    });
+});
+
+describe("triggerNow (CronJobs)", () => {
+    it("runs kubectl create job --from=cronjob/{name} {name}-manual-{ts}; ok on exit 0", async () => {
+        pickResourceInstance.mockResolvedValueOnce("nightly");
+        runLive.mockResolvedValueOnce(0);
+        await SPECIFIC_VERBS.triggerNow.handler(cronJobResource, CTX, NS);
+        const [, args] = runLive.mock.calls[0];
+        expect(args).toContain("create");
+        expect(args).toContain("job");
+        expect(args.some((a) => a === "--from=cronjob/nightly")).toBe(true);
+        expect(args.some((a) => /^nightly-manual-\d+$/.test(a))).toBe(true);
+        expect(ok).toHaveBeenCalled();
+    });
+
+    it("warns on non-zero exit", async () => {
+        pickResourceInstance.mockResolvedValueOnce("nightly");
+        runLive.mockResolvedValueOnce(1);
+        await SPECIFIC_VERBS.triggerNow.handler(cronJobResource, CTX, NS);
+        expect(warn).toHaveBeenCalled();
+    });
+
+    it("returns early when pick resolves null", async () => {
+        pickResourceInstance.mockResolvedValueOnce(null);
+        await SPECIFIC_VERBS.triggerNow.handler(cronJobResource, CTX, NS);
+        expect(runLive).not.toHaveBeenCalled();
     });
 });
 

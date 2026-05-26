@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.10.0 — 2026-05-26
+
+- Resource registry gains **StatefulSets, DaemonSets, Jobs, CronJobs** under the Workloads group; CronJobs picks up a new `triggerNow` verb (`kubectl create job --from=cronjob/...`).
+- `logs` verb now resolves a Job's underlying pod via `--selector=job-name=...` before streaming; warns if the pod is gone or if `logs` is invoked on an unsupported kind.
+- StatefulSets get the full workload toolkit (scale + rollout family + portForward); DaemonSets omit scale (one-pod-per-node by design); Jobs omit edit (most fields immutable).
+
 ## v1.9.0 — 2026-05-26
 
 - Resource registry now carries the full verb sets for all 9 resources (Pods/Deployments/ReplicaSets/ConfigMaps/Secrets/Ingress/ServiceAccounts/Services + the newly added VirtualService). The two-level menu drives every command through the universal/specific verb libraries.

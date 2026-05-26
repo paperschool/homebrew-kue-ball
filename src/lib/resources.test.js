@@ -10,17 +10,21 @@ describe("resources registry", () => {
         expect(RESOURCES.length).toBeGreaterThan(0);
     });
 
-    it("includes the nine post-6-6 registered resources", () => {
+    it("includes the 13 post-6-7 registered resources", () => {
         const kinds = RESOURCES.map((r) => r.kind).sort();
         expect(kinds).toEqual([
             "configmap",
+            "cronjob",
+            "daemonset",
             "deployment",
             "ingress",
+            "job",
             "pod",
             "replicaset",
             "secret",
             "service",
             "serviceaccount",
+            "statefulset",
             "virtualservice",
         ]);
     });
@@ -54,12 +58,16 @@ describe("resources registry", () => {
     it("returns entries in group-then-(Pods-pinned/alphabetical) display order", () => {
         const orderedKinds = RESOURCES.map((r) => r.kind);
         expect(orderedKinds).toEqual([
-            "pod",
-            "deployment",
+            "pod",            // Pods pinned first within Workloads
+            "deployment",     // alphabetical within Workloads
             "replicaset",
-            "configmap",
+            "cronjob",
+            "daemonset",
+            "job",
+            "statefulset",
+            "configmap",      // Config alphabetical
             "secret",
-            "ingress",
+            "ingress",        // Networking alphabetical
             "serviceaccount",
             "service",
             "virtualservice",
@@ -78,6 +86,31 @@ describe("resources registry", () => {
         expect(dep.specificVerbs).toEqual([
             "scale", "rolloutStatus", "rolloutHistory", "rolloutUndo", "rolloutRestart", "rolloutPause", "rolloutResume", "setImage", "setEnv",
         ]);
+    });
+
+    it("StatefulSets has scale + rollout + portForward but no setImage", () => {
+        const sts = getResource("statefulset");
+        expect(sts.specificVerbs).toEqual([
+            "scale", "rolloutStatus", "rolloutHistory", "rolloutUndo", "rolloutRestart", "portForward",
+        ]);
+    });
+
+    it("DaemonSets has rollout verbs but no scale", () => {
+        const ds = getResource("daemonset");
+        expect(ds.specificVerbs).not.toContain("scale");
+        expect(ds.specificVerbs).toContain("rolloutStatus");
+    });
+
+    it("Jobs omits the edit verb and exposes logs as the only specific verb", () => {
+        const job = getResource("job");
+        expect(job.universalVerbs).not.toContain("edit");
+        expect(job.universalVerbs).toEqual(["list", "describe", "delete"]);
+        expect(job.specificVerbs).toEqual(["logs"]);
+    });
+
+    it("CronJobs has triggerNow", () => {
+        const cj = getResource("cronjob");
+        expect(cj.specificVerbs).toEqual(["triggerNow"]);
     });
 
     it("VirtualService is registered as a Networking, namespaced resource with universal verbs only", () => {

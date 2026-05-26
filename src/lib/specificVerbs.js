@@ -6,10 +6,18 @@ import {
     runShell,
     isJqAvailable,
 } from "./runner.js";
+import { run } from "./shell.js";
 import { pickResourceInstance } from "./universalVerbs.js";
 import { ok, warn } from "./output.js";
 import { APP_NAME } from "./env.js";
 import { select, input, confirm } from "@inquirer/prompts";
+
+// For a Job, the actual logs live on the Pod that the Job spawned. Resolve it via the job-name selector.
+function resolveJobPod(jobName, ctx, ns) {
+    const cmd = `kubectl --context=${ctx} --namespace=${ns} get pods --selector=job-name=${jobName} -o jsonpath='{.items[0].metadata.name}'`;
+    const raw = run(cmd, { silent: true });
+    return raw && raw.trim() ? raw.trim() : null;
+}
 
 function baseArgs(resource, ctx, ns) {
     const args = [`--context=${ctx}`];
@@ -58,11 +66,22 @@ export const SPECIFIC_VERBS = {
         handler: async (resource, ctx, ns) => {
             const name = await pickOrBail(resource, ctx, ns);
             if (!name) return;
+            let podName = name;
+            if (resource.kind === "job") {
+                podName = resolveJobPod(name, ctx, ns);
+                if (!podName) {
+                    warn(`Job "${name}" has no running or completed pod yet.`);
+                    return;
+                }
+            } else if (resource.kind !== "pod") {
+                warn("logs verb is only registered for Pods and Jobs.");
+                return;
+            }
             await runLivePipedWithExitKeys("kubectl", [
                 ...baseArgs(resource, ctx, ns),
                 "logs",
                 "-f",
-                name,
+                podName,
                 "--tail=200",
             ]);
         },
@@ -280,6 +299,21 @@ export const SPECIFIC_VERBS = {
                 ...baseArgs(resource, ctx, ns),
                 "taint", "nodes", name, spec,
             ]);
+        },
+    },
+
+    triggerNow: {
+        displayName: "Trigger now",
+        handler: async (resource, ctx, ns) => {
+            const name = await pickOrBail(resource, ctx, ns);
+            if (!name) return;
+            const manualName = `${name}-manual-${Date.now()}`;
+            const code = await runLive("kubectl", [
+                ...baseArgs(resource, ctx, ns),
+                "create", "job", `--from=cronjob/${name}`, manualName,
+            ]);
+            if (code === 0) ok(`Triggered Job "${manualName}" from CronJob "${name}".`);
+            else warn(`Trigger failed with exit code ${code}.`);
         },
     },
 };

@@ -1,0 +1,105 @@
+# generated: 2026-05-26
+# last_updated: 2026-05-26
+# project: homebrew-kue-ball
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: .product_design/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-05-26
+last_updated: 2026-05-26
+project: homebrew-kue-ball
+project_key: NOKEY
+tracking_system: file-system
+story_location: .product_design/implementation-artifacts
+
+development_status:
+  # Epic 1 — Foundation: Tooling & Core Utilities
+  epic-1: done
+  1-1-vitest-setup-folder-scaffold: done
+  1-2-output-js-colours-logging-helpers: done
+  1-3-prefs-js-preference-persistence: done
+  1-4-env-js-environment-constants: done
+  1-5-shell-js-process-execution: done
+  1-6-kubectl-js-kubeconfig-helpers: done
+  1-7-azure-js-azure-cli-helpers: done
+  1-8-helm-js-helm-helpers: done
+  1-9-ping-js-http-ping-route-discovery: done
+  1-10-runner-js-command-runner-helpers: done
+  epic-1-retrospective: optional
+
+  # Epic 2 — Reusable UI Components
+  epic-2: done
+  2-1-searchable-list-fuzzy-filtered-grouped-list: done
+  2-2-searchable-multi-select-grouped-checkbox-with-pre-selection: done
+  2-3-resource-picker-spinner-fetch-pick-flow: done
+  epic-2-retrospective: optional
+
+  # Epic 3 — Command Groups
+  epic-3: done
+  3-1-pods-pods-command-group: done
+  3-2-logs-logs-command-group: done
+  3-3-deployments-deployments-command-group: done
+  3-4-services-services-ingress-command-group: done
+  3-5-config-config-command-group: done
+  3-6-events-events-command-group: done
+  3-7-resources-resource-usage-command-group: done
+  3-8-contexts-contexts-command-group: done
+  3-9-exec-exec-command-group: done
+  3-10-helm-helm-command-group: done
+  3-11-ping-ping-command-group: done
+  epic-3-retrospective: optional
+
+  # Epic 4 — Wire-up & Integration
+  epic-4: done
+  4-1-main-js-assemble-command-groups-and-main-application-loop: done
+  4-2-thin-entry-point-kubectl-wizard-mjs: done
+  epic-4-retrospective: optional
+
+  # Epic 5 — TUI Chrome & Persistent Status Bar
+  epic-5: done
+  5-1-chrome-js-tui-chrome-foundation: done
+  5-2-azure-identity-panel-in-status-bar: done
+  5-3-auth-poller-background-auth-health-poller: done
+  5-4-anchored-search-input: done
+  epic-5-retrospective: optional
+
+  # Epic 6 — Resource × Verb Menu Redesign
+  epic-6: backlog
+  6-1-resources-js-resource-registry: backlog
+  6-2-universal-verbs-generic-list-describe-delete-edit: backlog
+  6-3-specific-verbs-pod-workload-specific-verbs: backlog
+  6-4-node-specific-verbs-cordon-uncordon-drain-taint: backlog
+  6-5-resource-verb-menu-navigation-in-main-js: backlog
+  6-6-migrate-existing-command-modules-into-the-registry: backlog
+  6-7-add-new-resources-statefulsets-daemonsets-jobs-cronjobs: backlog
+  6-8-add-cluster-scoped-storage-resources-nodes-hpa-pvc-pv: backlog
+  epic-6-retrospective: optional

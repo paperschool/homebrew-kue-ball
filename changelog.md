@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.2 — 2026-05-26
+
+- Expanded Epic 6 (Resource × Verb Menu Redesign) breakdown in planning artifacts and seeded sprint-status tracking for stories 6-1 through 6-8.
+- Added `.github/prompts/version-and-commit.prompt.md` for repeatable changelog-driven version bumps.
+
 ## v1.3.1 — 2026-05-26
 
 - README hero swapped to a side-by-side two-screenshot layout showing the home interface and the list interface, plus added a platform note.

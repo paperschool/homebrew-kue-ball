@@ -28,6 +28,11 @@ Decomposition of the modularisation PRD into epics and stories. The goal is to t
 - **FR9** A persistent status bar at the bottom shows the active Azure identity (truncated email · subscription name) and is populated on startup
 - **FR10** A background health poller updates an auth indicator (🔒 green/red) in the status bar every 15 seconds without blocking foreground interactions
 - **FR11** During fuzzy-match interactions, the search input anchors above the status bar; the result list scrolls in the content area above it
+- **FR12** The command menu is two-level: first a resource-type selector, then a verb selector scoped to the chosen resource
+- **FR13** A single resource registry (`src/lib/resources.js`) is the source of truth for resource types, their kubectl identifiers, display names, and supported verb sets
+- **FR14** Universal verbs (list, describe, edit, delete) have a single generic implementation that works for any registered resource type
+- **FR15** New resource types can be added by registering them in `src/lib/resources.js` without touching menu navigation or universal verb-handler code
+- **FR16** Helm and Ping remain top-level entries alongside the resource picker — they are not bound to a kubernetes resource type
 
 ### Non-Functional Requirements
 
@@ -41,19 +46,24 @@ Decomposition of the modularisation PRD into epics and stories. The goal is to t
 
 ### FR Coverage Map
 
-| FR   | Epic 1 | Epic 2 | Epic 3 | Epic 4 | Epic 5 |
-| ---- | ------ | ------ | ------ | ------ | ------ |
-| FR1  | ✓      | ✓      | ✓      | ✓      |        |
-| FR2  |        | ✓      |        |        |        |
-| FR3  |        | ✓      |        |        |        |
-| FR4  |        | ✓      |        |        |        |
-| FR5  | ✓      | ✓      | ✓      | ✓      |        |
-| FR6  | ✓      | ✓      | ✓      |        |        |
-| FR7  |        |        |        | ✓      |        |
-| FR8  |        |        |        |        | ✓      |
-| FR9  |        |        |        |        | ✓      |
-| FR10 |        |        |        |        | ✓      |
-| FR11 |        |        |        |        | ✓      |
+| FR   | Epic 1 | Epic 2 | Epic 3 | Epic 4 | Epic 5 | Epic 6 |
+| ---- | ------ | ------ | ------ | ------ | ------ | ------ |
+| FR1  | ✓      | ✓      | ✓      | ✓      |        |        |
+| FR2  |        | ✓      |        |        |        |        |
+| FR3  |        | ✓      |        |        |        |        |
+| FR4  |        | ✓      |        |        |        |        |
+| FR5  | ✓      | ✓      | ✓      | ✓      |        | ✓      |
+| FR6  | ✓      | ✓      | ✓      |        |        | ✓      |
+| FR7  |        |        |        | ✓      |        |        |
+| FR8  |        |        |        |        | ✓      |        |
+| FR9  |        |        |        |        | ✓      |        |
+| FR10 |        |        |        |        | ✓      |        |
+| FR11 |        |        |        |        | ✓      |        |
+| FR12 |        |        |        |        |        | ✓      |
+| FR13 |        |        |        |        |        | ✓      |
+| FR14 |        |        |        |        |        | ✓      |
+| FR15 |        |        |        |        |        | ✓      |
+| FR16 |        |        |        |        |        | ✓      |
 
 ---
 
@@ -66,6 +76,7 @@ Decomposition of the modularisation PRD into epics and stories. The goal is to t
 | 3   | Command Groups                        | Each command group extracted into its own module                                                            |
 | 4   | Wire-up & Integration                 | `src/main.js` assembled, entry-point thinned, CLI verified end-to-end                                       |
 | 5   | TUI Chrome & Persistent Status Bar    | Persistent title bar, status bar frame, Azure identity panel, auth health poller, and anchored search input |
+| 6   | Resource × Verb Menu Redesign         | Two-level menu (resource → verb) backed by a single resource registry and reusable universal-verb handlers  |
 
 ---
 
@@ -836,3 +847,230 @@ So that my eye and cursor position are stable and predictable regardless of resu
 
 - This story carries the highest implementation risk: `@inquirer/search` positions its own prompt at the current cursor row. Cursor pre-positioning before the `search()` call is the simplest approach and is likely sufficient, but if the library re-homes the cursor on each render cycle, a more involved intercept will be needed. The developer should prototype the cursor approach first and flag to the PM if a deeper change is required before completing the story.
 - `chrome.isActive()` is a simple boolean getter exported from `src/ui/chrome.js` — add it in this story if not already present.
+
+---
+
+## Epic 6: Resource × Verb Menu Redesign
+
+**Goal:** Replace the current flat command menu with a two-level navigation: pick a resource type, then pick a verb scoped to that resource. A single resource registry is the source of truth, and universal verbs (list, describe, edit, delete) have one generic implementation that works for any registered resource — eliminating the per-resource-type copy-pasta that dominates `src/commands/*` today. New resource types become a one-line registry entry, and the gaps from `.product_design/kubectl-verbs-reference.md` (StatefulSets, DaemonSets, Jobs, CronJobs, Nodes, HPA, PVC, plus `scale`, `port-forward`, `set image`, node ops, etc.) plug into the framework instead of each requiring a bespoke command builder.
+
+**FRs covered:** FR12, FR13, FR14, FR15, FR16
+
+**NFRs covered:** NFR1 (no regression of existing flows post-migration), NFR4 (each story is independently mergeable: the framework can land before any migration, and migrations are per-resource)
+
+**Dependency:** Epic 5 complete. Epic 6 also depends on the `step()` / `clearContent()` chrome helpers (added post-Epic 5) to render the two-level wizard cleanly.
+
+**Reference:** `.product_design/kubectl-verbs-reference.md` enumerates the verb-per-resource catalog this epic targets.
+
+---
+
+### Story 6.1: `src/lib/resources.js` — resource registry
+
+As a developer,
+I want a single registry that maps resource types to their kubectl identifiers, display labels, and supported verbs,
+So that menu navigation, verb dispatch, and future-resource additions all read from one source of truth instead of being scattered across command modules.
+
+**Acceptance Criteria:**
+
+**Given** `src/lib/resources.js` is created
+**When** imported
+**Then** it exports a `RESOURCES` array (or `Map`) of resource entries, plus `getResource(kind)` and `getResources()` helpers
+**And** each resource entry has the shape `{ kind, plural, displayName, group, namespaced, universalVerbs, specificVerbs }` where:
+- `kind` is the singular kubectl name (e.g. `"pod"`, `"deployment"`)
+- `plural` is the kubectl plural (e.g. `"pods"`, `"deployments"`)
+- `displayName` is the user-facing label (e.g. `"Pods"`, `"Deployments"`)
+- `group` is the menu grouping label (e.g. `"Workloads"`, `"Config"`, `"Networking"`, `"Cluster"`, `"Storage"`) used by `searchableList` separators
+- `namespaced` is `true` for namespace-scoped resources, `false` for cluster-scoped (Nodes, ClusterRoles, PVs)
+- `universalVerbs` is an array of strings naming verbs from the universal-verb library (subset of `["list", "describe", "edit", "delete"]`)
+- `specificVerbs` is an array of strings naming verbs from the specific-verb library (e.g. `["logs", "exec", "scale", "rolloutStatus", "cordon"]`)
+
+**And** the registry includes entries for Pods, Deployments, ReplicaSets, Services, ConfigMaps, Secrets, Ingress, ServiceAccounts (the resources currently covered by `src/commands/*`)
+**And** `resources.test.js` asserts:
+- every entry has all required fields
+- `getResource("pod")` returns the Pods entry
+- `getResource("nonexistent")` returns `null` (or `undefined`)
+- `getResources()` returns the array in display-order
+- no two entries share the same `kind`
+
+---
+
+### Story 6.2: `src/lib/universalVerbs.js` — generic list / describe / delete / edit
+
+As a developer,
+I want a single implementation of the four universal verbs that works against any registered resource,
+So that adding list/describe/edit/delete for a new resource type is zero-code — it's just adding the verb name to the resource's `universalVerbs` array.
+
+**Acceptance Criteria:**
+
+**Given** `src/lib/universalVerbs.js` is created
+**When** imported
+**Then** it exports `UNIVERSAL_VERBS`, a mapping from verb name to `{ displayName, handler }`:
+- `list` → `displayName: "List"`, handler runs `kubectl get {plural}` (with `-o wide` for namespaced resources where it adds value), via `runLiveWithOptionalWatch`
+- `describe` → `displayName: "Describe"`, handler picks a resource instance, then runs `kubectl describe {kind} {name}` via `runLive` and wires the `onEdit` callback so the pager's `e` key triggers `kubectl edit`
+- `edit` → `displayName: "Edit"`, handler picks a resource instance, then runs `kubectl edit {kind} {name}` via `spawnInteractive` with `KUBE_EDITOR=nano` (respecting an existing `KUBE_EDITOR` env var)
+- `delete` → `displayName: "Delete"`, handler picks a resource instance, prompts `confirm({ default: false })`, then runs `kubectl delete {kind} {name}` via `runLive` when confirmed
+
+**And** it exports `pickResourceInstance(resource, ctx, ns)` — a generic equivalent of `pickPod` that uses `resourcePicker` to fetch `kubectl get {plural} -o json`, present a searchable list with helpful per-row metadata (status/age/owner where available), and return the chosen name
+**And** for cluster-scoped resources (`namespaced: false`) the `--namespace` flag is omitted from kubectl calls
+**And** each handler signature is `(resource, ctx, ns) => Promise<void>` — same shape across all verbs
+**And** `universalVerbs.test.js` mocks `src/lib/runner`, `src/lib/shell`, `src/ui/resourcePicker`, and `@inquirer/prompts`, asserting:
+- `list.handler(podsResource, "ctx", "ns")` calls `runLiveWithOptionalWatch` with `["--context=ctx", "--namespace=ns", "get", "pods", "-o", "wide"]`
+- `list.handler(nodesResource, "ctx", "ns")` omits `--namespace` (cluster-scoped)
+- `describe.handler` calls `pickResourceInstance` and returns early when it resolves `null`
+- `delete.handler` does not call `runLive` when `confirm` resolves `false`
+- `edit.handler` calls `spawnInteractive("kubectl", ["edit", ...])` with `KUBE_EDITOR` set
+- `pickResourceInstance` warns and returns `null` when `kubectl get` produces zero items
+
+---
+
+### Story 6.3: `src/lib/specificVerbs.js` — pod & workload-specific verbs
+
+As a developer,
+I want the resource-specific verbs (logs, exec, scale, rollout, set, restart) implemented once in a shared library,
+So that Pods/Deployments/ReplicaSets/StatefulSets/DaemonSets all dispatch into the same code paths instead of each command module re-implementing them.
+
+**Acceptance Criteria:**
+
+**Given** `src/lib/specificVerbs.js` is created
+**When** imported
+**Then** it exports `SPECIFIC_VERBS`, a mapping from verb name to `{ displayName, handler }`, that contains at least:
+- `logs` — streams logs for a picked pod via `runLivePipedWithExitKeys` (port of the existing logs commands; respects `APP_NAME` for selector-based tailing)
+- `logsPrevious` — `--previous` log dump for a picked pod
+- `logsToFile` — dumps logs to a timestamped file under `./logs/`
+- `exec` — interactive shell into a picked pod (`sh`/`bash` selector)
+- `execOneOff` — one-off command in a picked pod (prompts for the command)
+- `scale` — prompts for replica count then runs `kubectl scale {kind}/{name} --replicas=N` (works for Deployments, ReplicaSets, StatefulSets)
+- `rolloutStatus`, `rolloutHistory`, `rolloutUndo`, `rolloutRestart`, `rolloutPause`, `rolloutResume` — six dispatchers around `kubectl rollout *` for the picked workload
+- `setImage` — prompts for `container=image` and runs `kubectl set image {kind}/{name} {container}={image}`
+- `setEnv` — prompts for `KEY=VALUE` and runs `kubectl set env {kind}/{name} {KEY}={VALUE}`
+- `top` — `kubectl top {plural}` (works for pods and nodes)
+- `portForward` — picks a resource, prompts for `localPort:remotePort`, runs `kubectl port-forward` via the interactive-with-exit-keys runner
+
+**And** each handler has the same `(resource, ctx, ns) => Promise<void>` signature; handlers that operate on a single instance call `pickResourceInstance` internally
+**And** confirm/destructive verbs (`scale` to 0, `rolloutUndo`, `setImage`) prompt before executing
+**And** `specificVerbs.test.js` mocks runner/shell/inquirer and asserts, for at least four representative verbs, that the correct kubectl invocation is produced and that the pickResourceInstance early-return path is honoured
+
+---
+
+### Story 6.4: Node-specific verbs — cordon, uncordon, drain, taint
+
+As a developer,
+I want node-management verbs added to the specific-verb library,
+So that node operations are first-class menu actions rather than something users must drop to a shell for.
+
+**Acceptance Criteria:**
+
+**Given** `src/lib/specificVerbs.js` is extended
+**When** the registry surfaces a Node resource (`namespaced: false`)
+**Then** the following verbs are added to `SPECIFIC_VERBS`:
+- `cordon` — picks a node, runs `kubectl cordon {node}`
+- `uncordon` — picks a node, runs `kubectl uncordon {node}`
+- `drain` — picks a node, prompts `confirm` (drain is disruptive), runs `kubectl drain {node} --ignore-daemonsets --delete-emptydir-data` via `runLivePipedWithExitKeys` so the user can interrupt
+- `taint` — picks a node, prompts `input` for the taint spec (e.g. `key=value:NoSchedule`), runs `kubectl taint nodes {node} {spec}`
+
+**And** these verbs honour `resource.namespaced === false` (no `--namespace` flag)
+**And** `specificVerbs.test.js` asserts:
+- `cordon.handler` calls `runLive` with `["--context=ctx", "cordon", "{node}"]`
+- `drain.handler` does not call any runner when `confirm` resolves `false`
+- all four verbs use `pickResourceInstance` against a cluster-scoped resource
+
+---
+
+### Story 6.5: Resource → verb menu navigation in `src/main.js`
+
+As a user,
+I want the main menu to show a list of resource types first and then a list of verbs for the resource I pick,
+So that I can navigate by "what" then "how" — which is how I actually think about kubectl operations — instead of scrolling a flat list of every `{verb} {resource}` combination.
+
+**Acceptance Criteria:**
+
+**Given** `src/main.js` is modified
+**When** the command loop iterates
+**Then** the flat `buildAllCommands(ctx, ns)` call is replaced with a two-level picker:
+1. `step("Choose resource", "Pick a kubernetes resource type to act on.")` followed by a `searchableList` whose items come from `getResources()` grouped by their `group` field (Workloads, Config, Networking, Cluster, Storage)
+2. The list also includes top-level entries for **Helm**, **Ping**, **Contexts**, and **Exit** — these are not resource-bound and route to their existing handlers (or sentinel returns like `"change-context"` / `"change-namespace"`)
+3. When a resource is chosen, `step("{Resource displayName} — choose action", "...")` shows a `searchableList` of the verbs in `resource.universalVerbs.concat(resource.specificVerbs)`, plus a "← Back to resources" item
+4. Choosing a verb invokes its handler; choosing "← Back" returns to the resource picker without exiting the loop
+5. After a verb's handler completes, the user is returned to the verb picker for that resource (so multiple operations on the same resource don't require re-picking it). A "← Back" or `q` brings them up to the resource picker.
+
+**And** error handling continues to use `isPermissionError` / `showPimReminder` exactly as before
+**And** `main.test.js` is updated to assert:
+- the top-level picker is built from `getResources()` plus the Helm/Ping/Contexts/Exit entries
+- selecting a resource then a verb calls the verb's handler with `(resource, ctx, ns)`
+- the "← Back" sentinel returns the user to the resource picker
+- `buildAllCommands` is removed (or no longer used by the main loop)
+
+---
+
+### Story 6.6: Migrate existing command modules into the registry
+
+As a developer,
+I want the existing `src/commands/*` modules to be deleted in favour of registry entries,
+So that the duplication they represent goes away and the new framework is the only path to user-facing commands.
+
+**Acceptance Criteria:**
+
+**Given** Stories 6.1–6.5 are complete and merged
+**When** the migration story runs
+**Then** the following resources in the registry are wired with their full verb set, matching today's behaviour or improving on it:
+- **Pods** — universal: `list, describe, edit, delete`; specific: `logs, logsPrevious, logsToFile, exec, execOneOff, top, portForward`
+- **Deployments** — universal: `list, describe, edit, delete`; specific: `scale, rolloutStatus, rolloutHistory, rolloutUndo, rolloutRestart, rolloutPause, rolloutResume, setImage, setEnv`
+- **ReplicaSets** — universal: `list, describe, edit, delete`; specific: `scale`
+- **Services** — universal: `list, describe, edit, delete`; specific: `portForward`
+- **ConfigMaps** — universal: `list, describe, edit, delete` (the existing "table vs YAML" toggle moves into the describe handler as a sub-prompt, or is dropped if redundant with the pager filter)
+- **Secrets** — universal: `list, describe, delete` (no edit by default — flag in a comment that it's intentional)
+- **Ingress** — universal: `list, describe, edit, delete`
+- **ServiceAccounts** — universal: `list, describe, delete`
+- **VirtualService** — universal: `list, describe, delete` (Istio CRD — same generic handlers work)
+
+**And** `src/commands/pods.js`, `logs.js`, `deployments.js`, `services.js`, `config.js`, `events.js`, `resources.js`, `contexts.js`, `exec.js` are deleted along with their tests (the registry + universal/specific verbs now cover the same behaviour)
+**And** `src/commands/helm.js` and `src/commands/ping.js` are preserved — they remain top-level entries
+**And** `src/commands/events.js` and `src/commands/resources.js` (`top pods` / `top nodes`) are folded into the verb layer: Events shows as a top-level entry (it's namespace-scoped but not really a "resource" in this UX), and `top` becomes a specific verb on Pods and Nodes
+**And** `npm test` passes — coverage is preserved or rewritten in `universalVerbs.test.js` / `specificVerbs.test.js` / `resources.test.js`
+**And** a manual smoke test of every previously-existing command confirms behavioural parity
+
+---
+
+### Story 6.7: Add new resources — StatefulSets, DaemonSets, Jobs, CronJobs
+
+As a user,
+I want StatefulSets, DaemonSets, Jobs, and CronJobs to appear in the resource picker with the verbs that make sense for them,
+So that I can manage stateful workloads, daemons, and batch jobs without dropping to a raw shell.
+
+**Acceptance Criteria:**
+
+**Given** the framework from Stories 6.1–6.5 is in place
+**When** the registry is extended
+**Then** the following resources are added:
+- **StatefulSets** — universal: `list, describe, edit, delete`; specific: `scale, rolloutStatus, rolloutHistory, rolloutUndo, rolloutRestart, portForward`
+- **DaemonSets** — universal: `list, describe, edit, delete`; specific: `rolloutStatus, rolloutHistory, rolloutUndo, rolloutRestart` (no `scale` — daemonsets run one pod per node)
+- **Jobs** — universal: `list, describe, delete`; specific: `logs` (via the pod the job created — handler resolves it)
+- **CronJobs** — universal: `list, describe, edit, delete`; specific: `triggerNow` (runs `kubectl create job --from=cronjob/{name} {name}-manual-{timestamp}`)
+
+**And** each new resource is grouped sensibly (StatefulSets/DaemonSets/Jobs/CronJobs under `Workloads`)
+**And** existing verb handlers in `specificVerbs.js` are extended only where new behaviour is required (e.g. `triggerNow` is genuinely new; `scale` already works for any `{kind}/{name}`)
+**And** `resources.test.js` is extended to cover the new entries
+
+---
+
+### Story 6.8: Add cluster-scoped & storage resources — Nodes, HPA, PVC, PV
+
+As a user,
+I want Nodes, HorizontalPodAutoscalers, PersistentVolumeClaims, and PersistentVolumes available in the resource picker,
+So that storage and cluster-level inspection is part of the same flow as workload management.
+
+**Acceptance Criteria:**
+
+**Given** the framework and the node-specific verbs from Story 6.4 are in place
+**When** the registry is extended
+**Then** the following resources are added:
+- **Nodes** (cluster-scoped) — universal: `list, describe, edit`; specific: `top, cordon, uncordon, drain, taint` (no `delete` — accidental node deletion is too dangerous)
+- **HPA** — universal: `list, describe, edit, delete`
+- **PVC** — universal: `list, describe, delete` (no edit — most PVC fields are immutable post-bind)
+- **PV** (cluster-scoped) — universal: `list, describe, delete`
+
+**And** each is grouped under `Cluster` (Nodes) or `Storage` (HPA/PVC/PV)
+**And** the `pickResourceInstance` helper handles cluster-scoped pickers correctly (no `--namespace` flag in the underlying `kubectl get` call)
+**And** `resources.test.js` is extended to assert the new entries' `namespaced` flag and verb sets
+
+---

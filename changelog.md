@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.7.0 — 2026-05-26
+
+- Added node-management specific verbs to `SPECIFIC_VERBS`: `cordon`, `uncordon`, `drain` (with confirm + exit-keys streaming), and `taint` (regex-validated spec).
+- All four omit `--namespace` because they only register on cluster-scoped resources.
+
 ## v1.6.0 — 2026-05-26
 
 - Added `src/lib/specificVerbs.js` — 16 workload-specific verb handlers: `logs / logsPrevious / logsToFile`, `exec / execOneOff`, `scale` (with zero-replicas confirm), the six `rollout*` verbs (status / history / undo / restart / pause / resume), `setImage` / `setEnv`, `top`, and `portForward`.

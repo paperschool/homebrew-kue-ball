@@ -332,6 +332,78 @@ describe("logsToFile", () => {
     });
 });
 
+describe("node verbs", () => {
+    it("cordon calls runLive with --context, cordon, name; no --namespace", async () => {
+        pickResourceInstance.mockResolvedValueOnce("worker-1");
+        await SPECIFIC_VERBS.cordon.handler(nodesResource, CTX, NS);
+        expect(runLive).toHaveBeenCalledWith("kubectl", [`--context=${CTX}`, "cordon", "worker-1"]);
+    });
+
+    it("uncordon calls runLive with --context, uncordon, name; no --namespace", async () => {
+        pickResourceInstance.mockResolvedValueOnce("worker-1");
+        await SPECIFIC_VERBS.uncordon.handler(nodesResource, CTX, NS);
+        expect(runLive).toHaveBeenCalledWith("kubectl", [`--context=${CTX}`, "uncordon", "worker-1"]);
+    });
+
+    it("drain prompts confirm; declined → no runner called", async () => {
+        pickResourceInstance.mockResolvedValueOnce("worker-1");
+        confirm.mockResolvedValueOnce(false);
+        await SPECIFIC_VERBS.drain.handler(nodesResource, CTX, NS);
+        expect(runLivePipedWithExitKeys).not.toHaveBeenCalled();
+        expect(runLive).not.toHaveBeenCalled();
+    });
+
+    it("drain confirmed → runLivePipedWithExitKeys with --ignore-daemonsets --delete-emptydir-data", async () => {
+        pickResourceInstance.mockResolvedValueOnce("worker-1");
+        confirm.mockResolvedValueOnce(true);
+        await SPECIFIC_VERBS.drain.handler(nodesResource, CTX, NS);
+        expect(runLivePipedWithExitKeys).toHaveBeenCalledWith("kubectl", [
+            `--context=${CTX}`,
+            "drain",
+            "worker-1",
+            "--ignore-daemonsets",
+            "--delete-emptydir-data",
+        ]);
+    });
+
+    it("taint rejects invalid spec without calling runLive", async () => {
+        pickResourceInstance.mockResolvedValueOnce("worker-1");
+        input.mockResolvedValueOnce("not-a-valid-taint");
+        await SPECIFIC_VERBS.taint.handler(nodesResource, CTX, NS);
+        expect(warn).toHaveBeenCalled();
+        expect(runLive).not.toHaveBeenCalled();
+    });
+
+    it("taint accepts key=value:NoSchedule and runs kubectl taint nodes <name> <spec>", async () => {
+        pickResourceInstance.mockResolvedValueOnce("worker-1");
+        input.mockResolvedValueOnce("dedicated=gpu:NoSchedule");
+        await SPECIFIC_VERBS.taint.handler(nodesResource, CTX, NS);
+        expect(runLive).toHaveBeenCalledWith("kubectl", [
+            `--context=${CTX}`,
+            "taint", "nodes", "worker-1", "dedicated=gpu:NoSchedule",
+        ]);
+    });
+
+    it("taint accepts effect-only spec (no value)", async () => {
+        pickResourceInstance.mockResolvedValueOnce("worker-1");
+        input.mockResolvedValueOnce("disk:NoSchedule");
+        await SPECIFIC_VERBS.taint.handler(nodesResource, CTX, NS);
+        expect(runLive).toHaveBeenCalledWith("kubectl", expect.arrayContaining([
+            "taint", "nodes", "worker-1", "disk:NoSchedule",
+        ]));
+    });
+
+    it("all four node verbs return early when pickResourceInstance resolves null", async () => {
+        for (const verb of ["cordon", "uncordon", "drain", "taint"]) {
+            vi.resetAllMocks();
+            pickResourceInstance.mockResolvedValueOnce(null);
+            await SPECIFIC_VERBS[verb].handler(nodesResource, CTX, NS);
+            expect(runLive).not.toHaveBeenCalled();
+            expect(runLivePipedWithExitKeys).not.toHaveBeenCalled();
+        }
+    });
+});
+
 describe("early-return path", () => {
     it.each([
         ["logs"], ["logsPrevious"], ["logsToFile"],

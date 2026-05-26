@@ -1,6 +1,6 @@
 # Story 6.4: Node-specific verbs — cordon, uncordon, drain, taint
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -25,30 +25,30 @@ so that node operations are first-class menu actions rather than something users
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Add `cordon` and `uncordon`** (AC: #1, #2, #3, #6)
-  - [ ] Both are tiny: pick → if null return → `runLive("kubectl", [...baseArgs(resource, ctx, ns), verb, name])`. The existing `baseArgs` helper from story 6-3 already strips `--namespace` for cluster-scoped resources, so re-use it — do not hand-roll a parallel arg builder.
-  - [ ] `cordon.displayName = "Cordon"`, `uncordon.displayName = "Uncordon"`.
+- [x] **Task 1: Add `cordon` and `uncordon`** (AC: #1, #2, #3, #6)
+  - [x] Both are tiny: pick → if null return → `runLive("kubectl", [...baseArgs(resource, ctx, ns), verb, name])`. The existing `baseArgs` helper from story 6-3 already strips `--namespace` for cluster-scoped resources, so re-use it — do not hand-roll a parallel arg builder.
+  - [x] `cordon.displayName = "Cordon"`, `uncordon.displayName = "Uncordon"`.
 
-- [ ] **Task 2: Add `drain`** (AC: #1, #4, #6)
-  - [ ] `displayName = "Drain"`.
-  - [ ] Pick → confirm → `runLivePipedWithExitKeys` (not `runLive`) so output streams and user can quit mid-drain. The `…WithExitKeys` runner returns the `RETURN_TO_MENU` sentinel which propagates correctly back up the command loop.
-  - [ ] Args: `[...baseArgs, "drain", name, "--ignore-daemonsets", "--delete-emptydir-data"]`.
+- [x] **Task 2: Add `drain`** (AC: #1, #4, #6)
+  - [x] `displayName = "Drain"`.
+  - [x] Pick → confirm → `runLivePipedWithExitKeys` (not `runLive`) so output streams and user can quit mid-drain. The `…WithExitKeys` runner returns the `RETURN_TO_MENU` sentinel which propagates correctly back up the command loop.
+  - [x] Args: `[...baseArgs, "drain", name, "--ignore-daemonsets", "--delete-emptydir-data"]`.
 
-- [ ] **Task 3: Add `taint`** (AC: #1, #5, #6)
-  - [ ] `displayName = "Taint"`.
-  - [ ] Pick → input → regex validate → if invalid `warn("Invalid taint spec. Format: key=value:NoSchedule (or PreferNoSchedule/NoExecute).")` and return.
-  - [ ] On valid: `runLive("kubectl", [...baseArgs, "taint", "nodes", name, spec])`. Note the literal `"nodes"` — `kubectl taint` requires the plural noun, unlike most other verbs.
+- [x] **Task 3: Add `taint`** (AC: #1, #5, #6)
+  - [x] `displayName = "Taint"`.
+  - [x] Pick → input → regex validate → if invalid `warn("Invalid taint spec. Format: key=value:NoSchedule (or PreferNoSchedule/NoExecute).")` and return.
+  - [x] On valid: `runLive("kubectl", [...baseArgs, "taint", "nodes", name, spec])`. Note the literal `"nodes"` — `kubectl taint` requires the plural noun, unlike most other verbs.
 
-- [ ] **Task 4: Extend `specificVerbs.test.js`** (AC: #7)
-  - [ ] Add a `nodesResource` fixture: `{ kind: "node", plural: "nodes", displayName: "Nodes", group: "Cluster", namespaced: false, universalVerbs: ["list", "describe", "edit"], specificVerbs: ["top", "cordon", "uncordon", "drain", "taint"] }`.
-  - [ ] One `describe` block per new verb, four tests minimum (one per AC #7 bullet).
-  - [ ] `cordon` test: assert `runLive` called with `["--context=ctx", "cordon", "node-1"]` exactly (no namespace, no extra flags).
-  - [ ] `drain` confirm-false test: `vi.mocked(confirm).mockResolvedValueOnce(false)`, then `expect(runLivePipedWithExitKeys).not.toHaveBeenCalled()`.
-  - [ ] `taint` invalid-input test: `vi.mocked(input).mockResolvedValueOnce("not-a-valid-taint")`, then `expect(warn).toHaveBeenCalled()` and `expect(runLive).not.toHaveBeenCalled()`.
+- [x] **Task 4: Extend `specificVerbs.test.js`** (AC: #7)
+  - [x] Add a `nodesResource` fixture: `{ kind: "node", plural: "nodes", displayName: "Nodes", group: "Cluster", namespaced: false, universalVerbs: ["list", "describe", "edit"], specificVerbs: ["top", "cordon", "uncordon", "drain", "taint"] }`.
+  - [x] One `describe` block per new verb, four tests minimum (one per AC #7 bullet).
+  - [x] `cordon` test: assert `runLive` called with `["--context=ctx", "cordon", "node-1"]` exactly (no namespace, no extra flags).
+  - [x] `drain` confirm-false test: `vi.mocked(confirm).mockResolvedValueOnce(false)`, then `expect(runLivePipedWithExitKeys).not.toHaveBeenCalled()`.
+  - [x] `taint` invalid-input test: `vi.mocked(input).mockResolvedValueOnce("not-a-valid-taint")`, then `expect(warn).toHaveBeenCalled()` and `expect(runLive).not.toHaveBeenCalled()`.
 
-- [ ] **Task 5: Verify no regressions**
-  - [ ] `npm test` — all existing tests + new node-verb tests pass.
-  - [ ] No changes outside `src/lib/specificVerbs.js` and its test.
+- [x] **Task 5: Verify no regressions**
+  - [x] `npm test` — all existing tests + new node-verb tests pass.
+  - [x] No changes outside `src/lib/specificVerbs.js` and its test.
 
 ## Dev Notes
 
@@ -113,10 +113,10 @@ src/lib/
 
 ### Definition of Done
 
-- [ ] All four new verbs present in `SPECIFIC_VERBS`.
-- [ ] Cluster-scoped argument handling verified (no `--namespace` ever appears).
-- [ ] `npm test` passes.
-- [ ] No file outside `src/lib/specificVerbs.js` + its test was touched.
+- [x] All four new verbs present in `SPECIFIC_VERBS`.
+- [x] Cluster-scoped argument handling verified (no `--namespace` ever appears).
+- [x] `npm test` passes.
+- [x] No file outside `src/lib/specificVerbs.js` + its test was touched.
 
 ### References
 

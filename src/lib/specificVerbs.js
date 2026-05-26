@@ -50,6 +50,7 @@ function makeRollout(sub, displayName, { requiresConfirm = false } = {}) {
 }
 
 const VALID_SPEC = /^[\w.-]+=.+/;
+const VALID_TAINT = /^[\w.-]+(=[^:]*)?:(NoSchedule|PreferNoSchedule|NoExecute)$/;
 
 export const SPECIFIC_VERBS = {
     logs: {
@@ -223,6 +224,61 @@ export const SPECIFIC_VERBS = {
                 "port-forward",
                 targetRef(resource, name),
                 ports,
+            ]);
+        },
+    },
+
+    cordon: {
+        displayName: "Cordon",
+        handler: async (resource, ctx, ns) => {
+            const name = await pickOrBail(resource, ctx, ns);
+            if (!name) return;
+            await runLive("kubectl", [...baseArgs(resource, ctx, ns), "cordon", name]);
+        },
+    },
+
+    uncordon: {
+        displayName: "Uncordon",
+        handler: async (resource, ctx, ns) => {
+            const name = await pickOrBail(resource, ctx, ns);
+            if (!name) return;
+            await runLive("kubectl", [...baseArgs(resource, ctx, ns), "uncordon", name]);
+        },
+    },
+
+    drain: {
+        displayName: "Drain",
+        handler: async (resource, ctx, ns) => {
+            const name = await pickOrBail(resource, ctx, ns);
+            if (!name) return;
+            const sure = await confirm({
+                message: `Drain node "${name}"? This evicts all pods.`,
+                default: false,
+            });
+            if (!sure) return;
+            await runLivePipedWithExitKeys("kubectl", [
+                ...baseArgs(resource, ctx, ns),
+                "drain",
+                name,
+                "--ignore-daemonsets",
+                "--delete-emptydir-data",
+            ]);
+        },
+    },
+
+    taint: {
+        displayName: "Taint",
+        handler: async (resource, ctx, ns) => {
+            const name = await pickOrBail(resource, ctx, ns);
+            if (!name) return;
+            const spec = await input({ message: "Taint spec (e.g. key=value:NoSchedule):" });
+            if (!VALID_TAINT.test(spec)) {
+                warn("Invalid taint spec. Format: key=value:NoSchedule (or PreferNoSchedule/NoExecute).");
+                return;
+            }
+            await runLive("kubectl", [
+                ...baseArgs(resource, ctx, ns),
+                "taint", "nodes", name, spec,
             ]);
         },
     },

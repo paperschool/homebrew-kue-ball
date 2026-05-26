@@ -14,17 +14,37 @@
 
 /** @type {Resource[]} */
 export const RESOURCES = [
-    { kind: "pod",            plural: "pods",            displayName: "Pods",            group: "Workloads",  namespaced: true, universalVerbs: ["list", "describe", "edit", "delete"], specificVerbs: [] },
-    { kind: "deployment",     plural: "deployments",     displayName: "Deployments",     group: "Workloads",  namespaced: true, universalVerbs: ["list", "describe", "edit", "delete"], specificVerbs: [] },
-    { kind: "replicaset",     plural: "replicasets",     displayName: "ReplicaSets",     group: "Workloads",  namespaced: true, universalVerbs: ["list", "describe", "edit", "delete"], specificVerbs: [] },
+    { kind: "pod",            plural: "pods",            displayName: "Pods",            group: "Workloads",  namespaced: true,
+      universalVerbs: ["list", "describe", "edit", "delete"],
+      specificVerbs: ["logs", "logsPrevious", "logsToFile", "exec", "execOneOff", "top", "portForward"] },
+    { kind: "deployment",     plural: "deployments",     displayName: "Deployments",     group: "Workloads",  namespaced: true,
+      universalVerbs: ["list", "describe", "edit", "delete"],
+      specificVerbs: ["scale", "rolloutStatus", "rolloutHistory", "rolloutUndo", "rolloutRestart", "rolloutPause", "rolloutResume", "setImage", "setEnv"] },
+    { kind: "replicaset",     plural: "replicasets",     displayName: "ReplicaSets",     group: "Workloads",  namespaced: true,
+      universalVerbs: ["list", "describe", "edit", "delete"],
+      specificVerbs: ["scale"] },
 
-    { kind: "configmap",      plural: "configmaps",      displayName: "ConfigMaps",      group: "Config",     namespaced: true, universalVerbs: ["list", "describe", "edit", "delete"], specificVerbs: [] },
+    { kind: "configmap",      plural: "configmaps",      displayName: "ConfigMaps",      group: "Config",     namespaced: true,
+      universalVerbs: ["list", "describe", "edit", "delete"],
+      specificVerbs: [] },
     // why: kubectl edit on secrets exposes base64 values in the editor — use a shell if you really need it
-    { kind: "secret",         plural: "secrets",         displayName: "Secrets",         group: "Config",     namespaced: true, universalVerbs: ["list", "describe", "delete"],         specificVerbs: [] },
+    { kind: "secret",         plural: "secrets",         displayName: "Secrets",         group: "Config",     namespaced: true,
+      universalVerbs: ["list", "describe", "delete"],
+      specificVerbs: [] },
 
-    { kind: "ingress",        plural: "ingresses",       displayName: "Ingress",         group: "Networking", namespaced: true, universalVerbs: ["list", "describe", "edit", "delete"], specificVerbs: [] },
-    { kind: "serviceaccount", plural: "serviceaccounts", displayName: "ServiceAccounts", group: "Networking", namespaced: true, universalVerbs: ["list", "describe", "delete"],         specificVerbs: [] },
-    { kind: "service",        plural: "services",        displayName: "Services",        group: "Networking", namespaced: true, universalVerbs: ["list", "describe", "edit", "delete"], specificVerbs: [] },
+    { kind: "ingress",        plural: "ingresses",       displayName: "Ingress",         group: "Networking", namespaced: true,
+      universalVerbs: ["list", "describe", "edit", "delete"],
+      specificVerbs: [] },
+    { kind: "serviceaccount", plural: "serviceaccounts", displayName: "ServiceAccounts", group: "Networking", namespaced: true,
+      universalVerbs: ["list", "describe", "delete"],
+      specificVerbs: [] },
+    { kind: "service",        plural: "services",        displayName: "Services",        group: "Networking", namespaced: true,
+      universalVerbs: ["list", "describe", "edit", "delete"],
+      specificVerbs: ["portForward"] },
+    // why: Istio CRD — generic universal verbs work, no editing in-place (most VS edits go through git/CD)
+    { kind: "virtualservice", plural: "virtualservices", displayName: "VirtualServices", group: "Networking", namespaced: true,
+      universalVerbs: ["list", "describe", "delete"],
+      specificVerbs: [] },
 ];
 
 const _seen = new Set();

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.9.0 — 2026-05-26
+
+- Resource registry now carries the full verb sets for all 9 resources (Pods/Deployments/ReplicaSets/ConfigMaps/Secrets/Ingress/ServiceAccounts/Services + the newly added VirtualService). The two-level menu drives every command through the universal/specific verb libraries.
+- Deleted 20 legacy `src/commands/*` files (pods, logs, deployments, services, config, events, resources, contexts, exec, replicasets and their tests). Helm and Ping are preserved as top-level extras.
+- Events and Contexts surface as inline top-level extras in the main menu; `top nodes` is temporarily unavailable until story 6-8 registers Nodes.
+
 ## v1.8.0 — 2026-05-26
 
 - Main menu switched to two-level navigation: pick a resource (from the registry), then pick a verb (universal or specific). `← Back to resources` returns to the resource picker; the resource → verb loop stays on the same resource between actions.

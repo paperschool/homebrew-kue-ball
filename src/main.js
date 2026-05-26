@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-import { buildPodsCommands } from "./commands/pods.js";
-import { buildLogsCommands } from "./commands/logs.js";
-import { buildDeploymentsCommands } from "./commands/deployments.js";
-import { buildReplicaSetsCommands } from "./commands/replicasets.js";
-import { buildServicesCommands } from "./commands/services.js";
-import { buildConfigCommands } from "./commands/config.js";
-import { buildEventsCommands } from "./commands/events.js";
-import { buildResourcesCommands } from "./commands/resources.js";
-import { buildContextsCommands } from "./commands/contexts.js";
-import { buildExecCommands } from "./commands/exec.js";
 import { buildHelmCommands } from "./commands/helm.js";
 import { buildPingCommands } from "./commands/ping.js";
 import { getResources } from "./lib/resources.js";
@@ -19,28 +9,11 @@ import { isHelmAvailable, getHelmVersion } from "./lib/helm.js";
 import { ok, warn, CYAN, YELLOW, DIM, RESET, RED, styleDeleteCommandLabel } from "./lib/output.js";
 import { APP_NAME, DEFAULT_NAMESPACE, DEFAULT_CONTEXT } from "./lib/env.js";
 import { refreshContexts, isPermissionError, showPimReminder, subscriptionForContext, isAzCliAvailable, getAzVersion } from "./lib/azure.js";
-import { RETURN_TO_MENU } from "./lib/runner.js";
+import { RETURN_TO_MENU, runLive } from "./lib/runner.js";
 import { searchableList } from "./ui/searchableList.js";
 import { initChrome, loadIdentity, setAuthStatus, drawSplash, hideSplash, setContextInfo, setLastCommand, setSubscription, step } from "./ui/chrome.js";
 import { startAuthPoller, stopAuthPoller } from "./ui/authPoller.js";
 import { confirm, input } from "@inquirer/prompts";
-
-export function buildAllCommands(ctx, ns) {
-    return [
-        ...buildPodsCommands(ctx, ns),
-        ...buildLogsCommands(ctx, ns),
-        ...buildDeploymentsCommands(ctx, ns),
-        ...buildReplicaSetsCommands(ctx, ns),
-        ...buildServicesCommands(ctx, ns),
-        ...buildConfigCommands(ctx, ns),
-        ...buildEventsCommands(ctx, ns),
-        ...buildResourcesCommands(ctx, ns),
-        ...buildContextsCommands(ctx, ns),
-        ...buildExecCommands(ctx, ns),
-        ...buildHelmCommands(ctx, ns),
-        ...buildPingCommands(ctx, ns),
-    ];
-}
 
 export function buildResourceMenu() {
     const resourceItems = getResources().map((r) => ({
@@ -51,10 +24,46 @@ export function buildResourceMenu() {
     const extras = [
         { name: "Helm",     value: { type: "extra", id: "helm" } },
         { name: "Ping",     value: { type: "extra", id: "ping" } },
+        { name: "Events",   value: { type: "extra", id: "events" } },
         { name: "Contexts", value: { type: "extra", id: "contexts" } },
         { name: "Exit",     value: { type: "extra", id: "exit" } },
     ];
     return [...resourceItems, ...extras];
+}
+
+// Events is a namespace-scoped read-only operation, not a resource the user "acts on" — surfacing it
+// as a top-level extra with two sub-commands matches how kubectl users actually reach for events.
+function buildEventsExtras(ctx, ns) {
+    return [
+        {
+            name: "Recent events — namespace",
+            run: () => runLive("kubectl", [`--context=${ctx}`, `--namespace=${ns}`, "get", "events", "--sort-by=.lastTimestamp"]),
+        },
+        {
+            name: "Warning events only",
+            run: () => runLive("kubectl", [`--context=${ctx}`, `--namespace=${ns}`, "get", "events", "--field-selector=type=Warning", "--sort-by=.lastTimestamp"]),
+        },
+    ];
+}
+
+// Contexts extras — return sentinels for "switch context" / "change namespace" so handleSentinel
+// owns the picker UI in one place.
+function buildContextsExtras() {
+    return [
+        {
+            name: "Refresh contexts (az aks get-credentials)",
+            run: async () => {
+                const refreshed = await refreshContexts();
+                if (refreshed) ok("Contexts updated — restart the wizard to use a new context.");
+            },
+        },
+        {
+            name: "List all contexts",
+            run: () => runLive("kubectl", ["config", "get-contexts"]),
+        },
+        { name: "Switch current context", run: () => "change-context" },
+        { name: "Change namespace",       run: () => "change-namespace" },
+    ];
 }
 
 export function buildVerbMenu(resource) {
@@ -163,8 +172,6 @@ function checkPrerequisites() {
     return { azAvailable: az.found };
 }
 
-// Runs a legacy `build*Commands(ctx, ns)`-style sub-picker (Helm / Ping / Contexts) and dispatches the chosen command.
-// Returns whatever the command's run() resolves to so the caller can forward sentinels (RETURN_TO_MENU, change-namespace).
 async function runLegacySubmenu(label, builder, ctx, ns) {
     step(label, "Pick an operation to run.");
     const commands = builder(ctx, ns);
@@ -244,7 +251,8 @@ async function main() {
             try {
                 if (top.id === "helm")     extraResult = await runLegacySubmenu("Helm",     buildHelmCommands,     context, currentNamespace);
                 if (top.id === "ping")     extraResult = await runLegacySubmenu("Ping",     buildPingCommands,     context, currentNamespace);
-                if (top.id === "contexts") extraResult = await runLegacySubmenu("Contexts", buildContextsCommands, context, currentNamespace);
+                if (top.id === "events")   extraResult = await runLegacySubmenu("Events",   buildEventsExtras,     context, currentNamespace);
+                if (top.id === "contexts") extraResult = await runLegacySubmenu("Contexts", buildContextsExtras,   context, currentNamespace);
             } catch (err) {
                 console.error(`\n  ${RED}✗ ${err.message}${RESET}`);
                 if (isPermissionError(err.message)) showPimReminder();
@@ -254,7 +262,6 @@ async function main() {
             continue;
         }
 
-        // Resource selected — enter the verb loop.
         const resource = top.resource;
         let stayOnResource = true;
         while (stayOnResource) {

@@ -10,7 +10,7 @@ describe("resources registry", () => {
         expect(RESOURCES.length).toBeGreaterThan(0);
     });
 
-    it("includes the eight resources currently covered by src/commands/*.js", () => {
+    it("includes the nine post-6-6 registered resources", () => {
         const kinds = RESOURCES.map((r) => r.kind).sort();
         expect(kinds).toEqual([
             "configmap",
@@ -21,6 +21,7 @@ describe("resources registry", () => {
             "secret",
             "service",
             "serviceaccount",
+            "virtualservice",
         ]);
     });
 
@@ -61,7 +62,32 @@ describe("resources registry", () => {
             "ingress",
             "serviceaccount",
             "service",
+            "virtualservice",
         ]);
+    });
+
+    it("Pods carries the full specific-verb set", () => {
+        const pods = getResource("pod");
+        expect(pods.specificVerbs).toEqual([
+            "logs", "logsPrevious", "logsToFile", "exec", "execOneOff", "top", "portForward",
+        ]);
+    });
+
+    it("Deployments carries scale + rollout + set verbs", () => {
+        const dep = getResource("deployment");
+        expect(dep.specificVerbs).toEqual([
+            "scale", "rolloutStatus", "rolloutHistory", "rolloutUndo", "rolloutRestart", "rolloutPause", "rolloutResume", "setImage", "setEnv",
+        ]);
+    });
+
+    it("VirtualService is registered as a Networking, namespaced resource with universal verbs only", () => {
+        const vs = getResource("virtualservice");
+        expect(vs).not.toBeNull();
+        expect(vs.group).toBe("Networking");
+        expect(vs.namespaced).toBe(true);
+        expect(vs.universalVerbs).toEqual(["list", "describe", "delete"]);
+        expect(vs.specificVerbs).toEqual([]);
+        expect(vs.universalVerbs).not.toContain("edit");
     });
 
     it("no two entries share the same kind", () => {

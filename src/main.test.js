@@ -1,15 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("./commands/pods.js", () => ({ buildPodsCommands: vi.fn().mockReturnValue([]) }));
-vi.mock("./commands/logs.js", () => ({ buildLogsCommands: vi.fn().mockReturnValue([]) }));
-vi.mock("./commands/deployments.js", () => ({ buildDeploymentsCommands: vi.fn().mockReturnValue([]) }));
-vi.mock("./commands/replicasets.js", () => ({ buildReplicaSetsCommands: vi.fn().mockReturnValue([]) }));
-vi.mock("./commands/services.js", () => ({ buildServicesCommands: vi.fn().mockReturnValue([]) }));
-vi.mock("./commands/config.js", () => ({ buildConfigCommands: vi.fn().mockReturnValue([]) }));
-vi.mock("./commands/events.js", () => ({ buildEventsCommands: vi.fn().mockReturnValue([]) }));
-vi.mock("./commands/resources.js", () => ({ buildResourcesCommands: vi.fn().mockReturnValue([]) }));
-vi.mock("./commands/contexts.js", () => ({ buildContextsCommands: vi.fn().mockReturnValue([]) }));
-vi.mock("./commands/exec.js", () => ({ buildExecCommands: vi.fn().mockReturnValue([]) }));
 vi.mock("./commands/helm.js", () => ({ buildHelmCommands: vi.fn().mockReturnValue([]) }));
 vi.mock("./commands/ping.js", () => ({ buildPingCommands: vi.fn().mockReturnValue([]) }));
 
@@ -55,7 +45,10 @@ vi.mock("./lib/env.js", () => ({
     DEFAULT_CONTEXT: "",
 }));
 
-vi.mock("./lib/runner.js", () => ({ RETURN_TO_MENU: "return-to-menu" }));
+vi.mock("./lib/runner.js", () => ({
+    RETURN_TO_MENU: "return-to-menu",
+    runLive: vi.fn(),
+}));
 
 vi.mock("./ui/searchableList.js", () => ({
     searchableList: vi.fn(),
@@ -138,9 +131,7 @@ vi.mock("./lib/specificVerbs.js", () => ({
 const listHandler = handlers.list;
 const scaleHandler = handlers.scale;
 
-import { buildAllCommands, buildResourceMenu, buildVerbMenu, dispatchVerb } from "./main.js";
-import { buildPodsCommands } from "./commands/pods.js";
-import { buildPingCommands } from "./commands/ping.js";
+import { buildResourceMenu, buildVerbMenu, dispatchVerb } from "./main.js";
 
 const CTX = "test-ctx";
 const NS = "test-ns";
@@ -149,24 +140,13 @@ beforeEach(() => {
     vi.clearAllMocks();
 });
 
-describe("buildAllCommands (legacy — unused by main loop after 6-5; still exported until 6-6)", () => {
-    it("returns a flat array concatenating all 12 builder results", () => {
-        buildPodsCommands.mockReturnValue([{ group: "Pods", name: "a", run: vi.fn() }]);
-        buildPingCommands.mockReturnValue([{ group: "Ping", name: "b", run: vi.fn() }]);
-        const result = buildAllCommands(CTX, NS);
-        expect(Array.isArray(result)).toBe(true);
-        expect(result[0].name).toBe("a");
-        expect(result[result.length - 1].name).toBe("b");
-    });
-});
-
 describe("buildResourceMenu", () => {
-    it("returns items for every registered resource plus the four extras", () => {
+    it("returns items for every registered resource plus the five extras", () => {
         const items = buildResourceMenu();
         const resources = items.filter((i) => i.value?.type === "resource");
         const extras = items.filter((i) => i.value?.type === "extra");
         expect(resources).toHaveLength(2);
-        expect(extras.map((e) => e.value.id)).toEqual(["helm", "ping", "contexts", "exit"]);
+        expect(extras.map((e) => e.value.id)).toEqual(["helm", "ping", "events", "contexts", "exit"]);
     });
 
     it("resource items carry the resource entry on value.resource and use the displayName as the visible name", () => {
@@ -194,8 +174,8 @@ describe("buildVerbMenu(resource)", () => {
 
     it("looks up displayName via UNIVERSAL_VERBS / SPECIFIC_VERBS", () => {
         const items = buildVerbMenu(podsResource);
-        expect(items[0].name).toBe("List");           // universal
-        expect(items.find((i) => i.value?.verb === "logs").name).toBe("Stream logs"); // specific
+        expect(items[0].name).toBe("List");
+        expect(items.find((i) => i.value?.verb === "logs").name).toBe("Stream logs");
     });
 
     it("skips unknown verb names with a warn instead of crashing", () => {

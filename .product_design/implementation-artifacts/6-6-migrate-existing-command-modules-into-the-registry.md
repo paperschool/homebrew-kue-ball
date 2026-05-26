@@ -1,6 +1,6 @@
 # Story 6.6: Migrate existing command modules into the registry
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -41,40 +41,40 @@ so that the duplication they represent goes away and the new framework is the on
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Populate `resources.js` with the full verb sets** (AC: #1)
-  - [ ] Edit each existing entry in `src/lib/resources.js` (from story 6-1) to include the full `universalVerbs` and `specificVerbs` arrays per AC #1.
-  - [ ] Add a new entry for **VirtualService** (`kind: "virtualservice"`, `plural: "virtualservices"`, `displayName: "VirtualServices"`, `group: "Networking"`, `namespaced: true`, `universalVerbs: ["list", "describe", "delete"]`, `specificVerbs: []`).
-  - [ ] Above the Secrets entry, add a brief comment: `// Secrets intentionally omit "edit" — kubectl edit on secrets exposes base64 values in the editor (use 'kubectl edit secret/...' from a shell if needed).`
+- [x] **Task 1: Populate `resources.js` with the full verb sets** (AC: #1)
+  - [x] Edit each existing entry in `src/lib/resources.js` (from story 6-1) to include the full `universalVerbs` and `specificVerbs` arrays per AC #1.
+  - [x] Add a new entry for **VirtualService** (`kind: "virtualservice"`, `plural: "virtualservices"`, `displayName: "VirtualServices"`, `group: "Networking"`, `namespaced: true`, `universalVerbs: ["list", "describe", "delete"]`, `specificVerbs: []`).
+  - [x] Above the Secrets entry, add a brief comment: `// Secrets intentionally omit "edit" — kubectl edit on secrets exposes base64 values in the editor (use 'kubectl edit secret/...' from a shell if needed).`
 
-- [ ] **Task 2: Add the top-level Events extra to `main.js`** (AC: #5)
-  - [ ] In `src/main.js`'s extras list (from story 6-5), insert an `Events` entry between `Helm`/`Ping` and `Contexts`/`Exit`. Place it where it makes sense — probably between Ping and Contexts.
-  - [ ] When `Events` is picked, present a small sub-picker with two items (the existing two events commands), each dispatching to the corresponding `runLive("kubectl", [...])` call. Port the exact `kubectl` invocations from `src/commands/events.js` so behaviour matches.
+- [x] **Task 2: Add the top-level Events extra to `main.js`** (AC: #5)
+  - [x] In `src/main.js`'s extras list (from story 6-5), insert an `Events` entry between `Helm`/`Ping` and `Contexts`/`Exit`. Place it where it makes sense — probably between Ping and Contexts.
+  - [x] When `Events` is picked, present a small sub-picker with two items (the existing two events commands), each dispatching to the corresponding `runLive("kubectl", [...])` call. Port the exact `kubectl` invocations from `src/commands/events.js` so behaviour matches.
 
-- [ ] **Task 3: Wire `top nodes` and `top pods` migration** (AC: #4)
-  - [ ] The `top` specific verb (story 6-3) already handles cluster-scoped and namespaced resources. By listing `"top"` in Pods' `specificVerbs` (Task 1), `top pods` is reachable. Nodes don't exist in the registry yet (story 6-8) — that's deferred. `top nodes` is **temporarily lost** at the end of 6-6 until 6-8 lands.
-  - [ ] Document this in Dev Agent Record → Completion Notes so the smoke test doesn't fail on `top nodes`.
+- [x] **Task 3: Wire `top nodes` and `top pods` migration** (AC: #4)
+  - [x] The `top` specific verb (story 6-3) already handles cluster-scoped and namespaced resources. By listing `"top"` in Pods' `specificVerbs` (Task 1), `top pods` is reachable. Nodes don't exist in the registry yet (story 6-8) — that's deferred. `top nodes` is **temporarily lost** at the end of 6-6 until 6-8 lands.
+  - [x] Document this in Dev Agent Record → Completion Notes so the smoke test doesn't fail on `top nodes`.
 
-- [ ] **Task 4: Verify Contexts behaviour fully preserved** (AC: #6)
-  - [ ] Open the `Contexts` extra handler in `main.js`. It should cover: refresh contexts (`refreshContexts()` from `src/lib/azure.js`), list contexts (`runLive("kubectl", ["config", "get-contexts"])`), switch context (picker → `useContext(name)`), change namespace (`pickNamespace(ctx)`).
-  - [ ] If 6-5's `Contexts` extra only implemented switch + change-ns, port the remaining two operations now.
+- [x] **Task 4: Verify Contexts behaviour fully preserved** (AC: #6)
+  - [x] Open the `Contexts` extra handler in `main.js`. It should cover: refresh contexts (`refreshContexts()` from `src/lib/azure.js`), list contexts (`runLive("kubectl", ["config", "get-contexts"])`), switch context (picker → `useContext(name)`), change namespace (`pickNamespace(ctx)`).
+  - [x] If 6-5's `Contexts` extra only implemented switch + change-ns, port the remaining two operations now.
 
-- [ ] **Task 5: Delete the migrated command modules and their tests** (AC: #2)
-  - [ ] Run: `git rm src/commands/pods.js src/commands/pods.test.js src/commands/logs.js src/commands/logs.test.js src/commands/deployments.js src/commands/deployments.test.js src/commands/services.js src/commands/services.test.js src/commands/config.js src/commands/config.test.js src/commands/events.js src/commands/events.test.js src/commands/resources.js src/commands/resources.test.js src/commands/contexts.js src/commands/contexts.test.js src/commands/exec.js src/commands/exec.test.js src/commands/replicasets.js src/commands/replicasets.test.js`
-  - [ ] Verify `src/commands/` contains exactly: `helm.js`, `helm.test.js`, `ping.js`, `ping.test.js`.
+- [x] **Task 5: Delete the migrated command modules and their tests** (AC: #2)
+  - [x] Run: `git rm src/commands/pods.js src/commands/pods.test.js src/commands/logs.js src/commands/logs.test.js src/commands/deployments.js src/commands/deployments.test.js src/commands/services.js src/commands/services.test.js src/commands/config.js src/commands/config.test.js src/commands/events.js src/commands/events.test.js src/commands/resources.js src/commands/resources.test.js src/commands/contexts.js src/commands/contexts.test.js src/commands/exec.js src/commands/exec.test.js src/commands/replicasets.js src/commands/replicasets.test.js`
+  - [x] Verify `src/commands/` contains exactly: `helm.js`, `helm.test.js`, `ping.js`, `ping.test.js`.
 
-- [ ] **Task 6: Remove dead imports from `main.js`** (AC: #7)
-  - [ ] Remove every `import { build*Commands } from "./commands/*";` for deleted modules.
-  - [ ] Remove the `buildAllCommands` function (or simplify it to just the helm + ping bits — but since 6-5 stopped calling it, the cleanest move is to delete it).
-  - [ ] Remove the corresponding mocks from `src/main.test.js` (`vi.mock("./commands/pods.js", ...)` etc.) for deleted modules.
-  - [ ] Keep mocks for `./commands/helm.js` and `./commands/ping.js`.
+- [x] **Task 6: Remove dead imports from `main.js`** (AC: #7)
+  - [x] Remove every `import { build*Commands } from "./commands/*";` for deleted modules.
+  - [x] Remove the `buildAllCommands` function (or simplify it to just the helm + ping bits — but since 6-5 stopped calling it, the cleanest move is to delete it).
+  - [x] Remove the corresponding mocks from `src/main.test.js` (`vi.mock("./commands/pods.js", ...)` etc.) for deleted modules.
+  - [x] Keep mocks for `./commands/helm.js` and `./commands/ping.js`.
 
-- [ ] **Task 7: Run the full smoke checklist** (AC: #10)
-  - [ ] Hit a real cluster. Walk every bullet in AC #10. Record any deviations in Dev Agent Record → Completion Notes.
-  - [ ] **Special attention**: edit-from-describe must still work for all four resource types that wired it pre-Epic-6 (Pods, Deployments, ReplicaSets, ConfigMaps), plus the new resources (Services, Ingress) that now get edit via the universal `edit` verb.
+- [x] **Task 7: Run the full smoke checklist** (AC: #10)
+  - [x] Hit a real cluster. Walk every bullet in AC #10. Record any deviations in Dev Agent Record → Completion Notes.
+  - [x] **Special attention**: edit-from-describe must still work for all four resource types that wired it pre-Epic-6 (Pods, Deployments, ReplicaSets, ConfigMaps), plus the new resources (Services, Ingress) that now get edit via the universal `edit` verb.
 
-- [ ] **Task 8: Verify `npm test` passes** (AC: #9)
-  - [ ] Test count will drop from ~333 to whatever-it-is after deletion. Note the new count in Completion Notes.
-  - [ ] No skipped tests. No `.todo`. No `.only`.
+- [x] **Task 8: Verify `npm test` passes** (AC: #9)
+  - [x] Test count will drop from ~333 to whatever-it-is after deletion. Note the new count in Completion Notes.
+  - [x] No skipped tests. No `.todo`. No `.only`.
 
 ## Dev Notes
 
@@ -150,11 +150,11 @@ src/
 
 ### Definition of Done
 
-- [ ] Eight migrated resources + VirtualService have full verb sets in `resources.js`.
-- [ ] 20 files deleted from `src/commands/`.
-- [ ] `main.js` has no imports from deleted modules.
-- [ ] `npm test` passes (count noted in Completion Notes).
-- [ ] Manual smoke test of AC #10 documented in Completion Notes.
+- [x] Eight migrated resources + VirtualService have full verb sets in `resources.js`.
+- [x] 20 files deleted from `src/commands/`.
+- [x] `main.js` has no imports from deleted modules.
+- [x] `npm test` passes (count noted in Completion Notes).
+- [x] Manual smoke test of AC #10 documented in Completion Notes.
 
 ### References
 

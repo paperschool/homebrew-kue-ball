@@ -81,6 +81,12 @@ describe("styleVerbLabel", () => {
         expect(styleVerbLabel("logsToFile",   "Dump logs to file")).toContain(BLUE);
     });
 
+    it("colours exec verbs green (interactive into the container)", () => {
+        expect(styleVerbLabel("exec",       "Shell into pod")).toContain(GREEN);
+        expect(styleVerbLabel("execOneOff", "Run one-off command")).toContain(GREEN);
+        expect(stripAnsi(styleVerbLabel("exec", "Shell into pod"))).toBe("Shell into pod");
+    });
+
     it("returns the label unchanged for verbs without a colour rule", () => {
         expect(styleVerbLabel("list", "List")).toBe("List");
         expect(styleVerbLabel("describe", "Describe")).toBe("Describe");

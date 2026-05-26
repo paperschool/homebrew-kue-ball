@@ -24,12 +24,14 @@ export function styleDeleteCommandLabel(label) {
 //   delete  → red    (destructive)
 //   edit    → yellow (mutating)
 //   logs*   → blue   (read-only, but visually distinct from other reads)
+//   exec*   → green  (interactive into the running container)
 // All other verbs render unchanged. Match is on the verb key (not the label) so
 // renamed displayNames stay coloured correctly.
 export function styleVerbLabel(verbName, label) {
     if (verbName === "delete") return `${RED}${label}${RESET}`;
     if (verbName === "edit")   return `${YELLOW}${label}${RESET}`;
     if (/^logs/.test(verbName)) return `${BLUE}${label}${RESET}`;
+    if (/^exec/.test(verbName)) return `${GREEN}${label}${RESET}`;
     return label;
 }
 

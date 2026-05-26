@@ -141,11 +141,20 @@ export const searchPrompt = createPrompt((config, done) => {
         loop: false,
     });
 
+    // When the caller omits message, suppress the entire header line (prefix + message).
+    // Useful when a chrome step() title above already names the action and the inline
+    // "? Action:" would be redundant noise.
+    const showHeader = !!config.message;
+
     if (status === "done" && backed) {
-        return `${prefix} ${config.message} ${DIM}← back${RESET}`.trimEnd();
+        return showHeader
+            ? `${prefix} ${config.message} ${DIM}← back${RESET}`.trimEnd()
+            : `${DIM}← back${RESET}`;
     }
     if (status === "done" && selectedChoice) {
-        return `${prefix} ${config.message} ${CYAN}${selectedChoice.name}${RESET}`.trimEnd();
+        return showHeader
+            ? `${prefix} ${config.message} ${CYAN}${selectedChoice.name}${RESET}`.trimEnd()
+            : `${CYAN}${selectedChoice.name}${RESET}`;
     }
 
     let error;
@@ -155,8 +164,9 @@ export const searchPrompt = createPrompt((config, done) => {
     // The query is shown in the chrome "Search:" header, so it is not echoed here.
     // (@inquirer/core slices rl.line off the end of this line; with a short, non-wrapping
     // prompt the hidden cursor stays consistent, so omitting the query renders cleanly.)
-    const header = [prefix, config.message].filter(Boolean).join(" ");
     const helpLine = enableBack ? HELP_LINE_WITH_BACK : HELP_LINE_DEFAULT;
     const body = [error ?? page, " ", helpLine].join("\n");
+    if (!showHeader) return body;
+    const header = [prefix, config.message].filter(Boolean).join(" ");
     return [header, body];
 });

@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.12.1 — 2026-05-26
+
+- `exec` and `execOneOff` verb labels now render green (interactive-into-the-container, distinct from blue read-only `logs*`).
+- Verb picker drops the redundant `? Action:` inline prompt header — the `step()` title above (`X — choose action`) already names the operation, so the inline prompt is just noise. The list of verbs renders directly below the step header.
+
 ## v1.12.0 — 2026-05-26
 
 - **Back-nav by keyboard.** In any sub-picker (verb picker, Helm / Ping / Events / Contexts sub-menus), hitting backspace against an empty search input or left arrow returns to the parent menu. The bottom hint line now reads `↑↓ navigate · ⏎ select · ⌫/← back`.

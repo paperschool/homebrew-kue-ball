@@ -266,7 +266,8 @@ async function main() {
         let stayOnResource = true;
         while (stayOnResource) {
             step(`${resource.displayName} — choose action`, "Pick an operation to run.");
-            const picked = await searchableList({ message: "Action:", items: buildVerbMenu(resource), enableBack: true });
+            // No `message` — the step() title above ("X — choose action") already names the operation.
+            const picked = await searchableList({ message: "", items: buildVerbMenu(resource), enableBack: true });
             if (!picked || picked === BACK_SIGNAL || picked.back) { stayOnResource = false; break; }
             setLastCommand(`${resource.displayName}: ${picked.verb}`);
             try {

@@ -1,10 +1,18 @@
 # kue-ball
 
-<p align="center">
-  <img src="docs/main.png" alt="Kue-Ball - Home Interface" height="500px" />
-</p>
+<table>
+  <tr>
+    <td>
+      <img src="docs/main.png" alt="Kue-Ball - Home Interface" width="100%" />
+    </td>
+    <td>
+      <img src="docs/main-2.png" alt="Kue-Ball - List Interface" width="100%" />
+    </td>
+  </tr>
+</table>
 
-Interactive `kubectl` wizard CLI for AKS clusters. Pick a context, pick a namespace, and run common operations through a fuzzy-searchable menu — no flags to memorise.
+
+Interactive `kubectl` wizard CLI for AKS clusters for use on mac (and possibly linux) devices. Pick a context, pick a namespace, and run common operations through a fuzzy-searchable menu — no flags to memorise.
 
 ## Requirements
 

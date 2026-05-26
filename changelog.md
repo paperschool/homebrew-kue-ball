@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.1 — 2026-05-26
+
+- README hero swapped to a side-by-side two-screenshot layout showing the home interface and the list interface, plus added a platform note.
+
 ## v1.3.0 — 2026-05-26
 
 - Helm command group now exposes "List pending Helm releases" and "List failed Helm releases" for quick triage of stuck deployments.

@@ -1,0 +1,30 @@
+{
+  "name": "kue-ball",
+  "version": "1.0.0",
+  "description": "Interactive kubectl wizard CLI — context/namespace/pod/log management for AKS clusters",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GITHUB_USER/homebrew-kue-ball.git"
+  },
+  "type": "module",
+  "bin": {
+    "kue-ball": "./src/main.js"
+  },
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@inquirer/core": "^11.1.10",
+    "@inquirer/prompts": "^8.4.2"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.7"
+  }
+}

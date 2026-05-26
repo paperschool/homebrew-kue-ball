@@ -1,1 +1,11 @@
+_bmad/
+.claude/skills
 node_modules/
+*.code-workspace
+
+# user runtime artefacts (kept out of the repo)
+logs/
+kubectl-wizard-prefs.json
+
+# we use npm — keep package-lock.json only
+yarn.lock

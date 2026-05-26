@@ -32,7 +32,7 @@ kue-ball
 npm install
 npm start
 # or
-node kubectl-wizard.mjs
+node src/main.js
 ```
 
 ## Configuration

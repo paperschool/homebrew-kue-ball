@@ -1,6 +1,6 @@
 # Story 6.2: `src/lib/universalVerbs.js` — generic list / describe / delete / edit
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -28,7 +28,7 @@ so that adding list/describe/edit/delete for a new resource type is zero-code �
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Implement `pickResourceInstance`** (AC: #7)
+- [x] **Task 1: Implement `pickResourceInstance`** (AC: #7)
   - [ ] Take `(resource, ctx, ns)`, return `Promise<string|null>`.
   - [ ] Build args: `["--context=" + ctx]`, append `"--namespace=" + ns` only if `resource.namespaced`, then `["get", resource.plural, "-o", "json"]`.
   - [ ] Use `resourcePicker({ spinnerMessage, emptyMessage, fetchFn, mapFn, listOptions })`:
@@ -38,33 +38,33 @@ so that adding list/describe/edit/delete for a new resource type is zero-code �
     - `mapFn`: maps each item to `{ name, value }`. Name format: `${item.metadata.name}  ${DIM}(${statusOrInfo})${RESET}` — where `statusOrInfo` is per-resource best-effort: pods use `phase`, deployments use `readyReplicas/replicas`, generic fallback is `created: {creationTimestamp}`.
     - `listOptions.message`: `Select ${resource.displayName.toLowerCase().replace(/s$/, "")}:` (singular).
 
-- [ ] **Task 2: Implement `UNIVERSAL_VERBS.list`** (AC: #2, #6)
+- [x] **Task 2: Implement `UNIVERSAL_VERBS.list`** (AC: #2, #6)
   - [ ] `displayName: "List"`.
   - [ ] Handler: build args `["--context=" + ctx]`, conditional `"--namespace=" + ns`, `["get", resource.plural, "-o", "wide"]`. Call `runLiveWithOptionalWatch("kubectl", args)`.
 
-- [ ] **Task 3: Implement `UNIVERSAL_VERBS.describe`** (AC: #3, #6)
+- [x] **Task 3: Implement `UNIVERSAL_VERBS.describe`** (AC: #3, #6)
   - [ ] `displayName: "Describe"`.
   - [ ] Handler: `const name = await pickResourceInstance(resource, ctx, ns); if (!name) return;`
   - [ ] Build describe args: `["--context=" + ctx]`, conditional `"--namespace=" + ns`, `["describe", resource.kind, name]`.
   - [ ] Build edit args (for `onEdit`): `["edit", resource.kind, name]`, conditional `"--namespace=" + ns`, `"--context=" + ctx` (note: existing code in `src/commands/pods.js:48-52` puts `--namespace` and `--context` AFTER `edit pod {name}` — keep that order to match existing tests).
   - [ ] `await runLive("kubectl", describeArgs, { onEdit: () => spawnInteractive("kubectl", editArgs, { env: { ...process.env, KUBE_EDITOR: process.env.KUBE_EDITOR ?? "nano" } }) });`
 
-- [ ] **Task 4: Implement `UNIVERSAL_VERBS.edit`** (AC: #4, #6)
+- [x] **Task 4: Implement `UNIVERSAL_VERBS.edit`** (AC: #4, #6)
   - [ ] `displayName: "Edit"`.
   - [ ] Handler: pick → if null return → `spawnInteractive("kubectl", editArgs, { env: ... })`. Same env+args pattern as the `onEdit` callback in task 3.
 
-- [ ] **Task 5: Implement `UNIVERSAL_VERBS.delete`** (AC: #5, #6)
+- [x] **Task 5: Implement `UNIVERSAL_VERBS.delete`** (AC: #5, #6)
   - [ ] `displayName: "Delete"`.
   - [ ] Handler: pick → if null return → `confirm({ message: \`Delete ${resource.kind} "${name}"${namespaced ? ` in namespace "${ns}"` : ""}?\`, default: false })` → if true, `runLive("kubectl", deleteArgs)`.
   - [ ] Build delete args: `["--context=" + ctx]`, conditional `"--namespace=" + ns`, `["delete", resource.kind, name]`.
 
-- [ ] **Task 6: Author `src/lib/universalVerbs.test.js`** (AC: #9)
+- [x] **Task 6: Author `src/lib/universalVerbs.test.js`** (AC: #9)
   - [ ] Top-of-file `vi.mock` blocks for `../lib/runner.js`, `../lib/shell.js`, `../ui/resourcePicker.js`, `@inquirer/prompts`. Mirror the mock style in `src/commands/pods.test.js`.
   - [ ] Define two fixture resources at the top: `podsResource = { kind: "pod", plural: "pods", displayName: "Pods", group: "Workloads", namespaced: true, universalVerbs: [...], specificVerbs: [] }` and `nodesResource = { ...same shape, kind: "node", plural: "nodes", namespaced: false }`.
   - [ ] One `describe` block per verb plus one for `pickResourceInstance`.
   - [ ] Each test follows arrange / act / assert with a blank line between phases (per `project-context.md §10.4`).
 
-- [ ] **Task 7: Verify no regressions**
+- [x] **Task 7: Verify no regressions**
   - [ ] `npm test` — should be 333 existing + universalVerbs tests.
   - [ ] No changes to `src/commands/*` or `src/main.js`.
 
@@ -174,8 +174,30 @@ src/lib/
 
 ### Agent Model Used
 
+claude-opus-4-7 (1M context)
+
 ### Debug Log References
+
+None — TDD red→green flow completed without diversions.
 
 ### Completion Notes List
 
+- **`baseArgs(resource, ctx, ns)` helper** centralizes the `--context` first / optional `--namespace` second pattern; story 6-3/6-4 can reuse it (it isn't exported yet — local to `universalVerbs.js`; if 6-3 needs it I'll either re-implement the same helper or export it then).
+- **`editArgs(resource, ctx, ns, name)` flips order** to match the existing per-module convention (`["edit", kind, name, --namespace, --context]`). This is what the existing tests in `src/commands/pods.test.js:93-99` etc. assert — keeping the pattern means story 6-6's migration won't need to rewrite tests.
+- **`describeInfo(item)` row-decorator fallback chain**: phase → ready replicas → creationTimestamp → empty. Matches the per-command picker labels closely enough that the migration won't feel like a UX regression.
+- **Cluster-scoped verb calls verified by tests** for `list`, `describe`, `delete`. All omit `--namespace` when `resource.namespaced === false`.
+- **No `events.js`-style horizontals or complex `delete`-cascades** ported. The deployment delete-with-orphaned-SA cascade in `src/commands/deployments.js:139-188` is NOT in this generic `delete.handler` — and shouldn't be. If that behaviour matters for story 6-6's migration, it'll need to be re-expressed (e.g. as a deployment-specific `deleteWithOrphans` verb in `specificVerbs.js`).
+- **File size:** `src/lib/universalVerbs.js` is 131 lines (within the 130-line target, just over by one — well under the 150-line ceiling). Test file is 267 lines.
+- **Regression scope:** `git status` confirms only the two new files plus `sprint-status.yaml` were touched.
+- **Test count delta:** 347 → 367 (+20). No skipped or `.todo` tests.
+
 ### File List
+
+- `src/lib/universalVerbs.js` (NEW)
+- `src/lib/universalVerbs.test.js` (NEW)
+- `.product_design/implementation-artifacts/6-2-universal-verbs-generic-list-describe-delete-edit.md` (this file)
+- `.product_design/implementation-artifacts/sprint-status.yaml` (status: in-progress → review)
+
+### Change Log
+
+- 2026-05-26 — Initial implementation: `UNIVERSAL_VERBS` map (list/describe/edit/delete), `pickResourceInstance` generic picker, baseArgs/editArgs/describeInfo helpers, 20 vitest cases. Status → review.

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.5.0 — 2026-05-26
+
+- Added `src/lib/universalVerbs.js` — the generic `list / describe / edit / delete` verb handlers that work against any registered resource, plus `pickResourceInstance(resource, ctx, ns)` (a generic equivalent of `pickPod`).
+- Cluster-scoped resources (e.g. Nodes, PVs) are handled correctly: `--namespace` is omitted from every kubectl call when `resource.namespaced === false`.
+- `describe` keeps the existing edit-from-pager wiring (`e` key launches `kubectl edit` with `KUBE_EDITOR` honoured).
+
 ## v1.4.1 — 2026-05-26
 
 - Pinned Pods first within the Workloads group of the resource registry (most-used kubectl resource); everything else stays alphabetical. Updated story 6-1's AC #5, the ordering test, and story 6-7's Workloads ordering rule to match.

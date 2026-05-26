@@ -1,5 +1,9 @@
 # kue-ball
 
+<p align="center">
+  <img src="docs/main.png" alt="Kue-Ball - Home Interface" height="500px" />
+</p>
+
 Interactive `kubectl` wizard CLI for AKS clusters. Pick a context, pick a namespace, and run common operations through a fuzzy-searchable menu — no flags to memorise.
 
 ## Requirements
@@ -39,11 +43,11 @@ node src/main.js
 
 The wizard works out of the box with zero config. Optionally set environment variables to pre-select your app and namespace:
 
-| Variable | Purpose | Default |
-|---|---|---|
-| `KUBECTL_WIZARD_APP` | App name used for log selectors & deployment shortcuts | *(none)* |
-| `KUBECTL_WIZARD_NAMESPACE` | Namespace pre-selected at startup | `default` |
-| `KUBECTL_WIZARD_CONTEXT` | kubeconfig context floated to the top of the list | *(none)* |
+| Variable                   | Purpose                                                | Default   |
+| -------------------------- | ------------------------------------------------------ | --------- |
+| `KUBECTL_WIZARD_APP`       | App name used for log selectors & deployment shortcuts | *(none)*  |
+| `KUBECTL_WIZARD_NAMESPACE` | Namespace pre-selected at startup                      | `default` |
+| `KUBECTL_WIZARD_CONTEXT`   | kubeconfig context floated to the top of the list      | *(none)*  |
 
 Example:
 

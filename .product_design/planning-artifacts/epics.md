@@ -2,7 +2,7 @@
 stepsCompleted: ["step-01", "step-02", "step-03-epic-2", "step-03-epic-3", "step-03-epic-4", "step-03-epic-5"]
 inputDocuments:
   - .product_design/base_prd.md
-  - project-context.md
+  - .product_design/project-context.md
 ---
 
 # homebrew-kue-ball — Epic Breakdown

@@ -46,7 +46,7 @@ Split the monolithic `kubectl-wizard.mjs` into logical, testable modules with sh
 
 ## Engineering Standards
 
-All development must comply with the standards defined in [`project-context.md`](../project-context.md) at the project root. Key standards applicable to this project:
+All development must comply with the standards defined in [`project-context.md`](./project-context.md). Key standards applicable to this project:
 
 - **File size** — no source file exceeds 150 lines of non-test code (§4)
 - **Naming** — camelCase functions with verb phrases; SCREAMING_SNAKE_CASE constants; no generic names (`data`, `result`, `temp`) (§3)

@@ -19,7 +19,7 @@ Interactive `kubectl` wizard CLI for AKS clusters. Pick a context, pick a namesp
 ### Homebrew (recommended)
 
 ```bash
-brew tap GITHUB_USER/kue-ball
+brew tap paperschool/kue-ball
 brew install kue-ball
 ```
 

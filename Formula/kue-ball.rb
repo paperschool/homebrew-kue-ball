@@ -1,7 +1,7 @@
 class KueBall < Formula
   desc "Interactive kubectl wizard CLI for AKS clusters"
-  homepage "https://github.com/GITHUB_USER/homebrew-kue-ball"
-  url "https://github.com/GITHUB_USER/homebrew-kue-ball/archive/refs/tags/v1.0.0.tar.gz"
+  homepage "https://github.com/paperschool/homebrew-kue-ball"
+  url "https://github.com/paperschool/homebrew-kue-ball/archive/refs/tags/v1.0.0.tar.gz"
   sha256 "FILL_IN_AFTER_RELEASE"
   license "MIT"
 

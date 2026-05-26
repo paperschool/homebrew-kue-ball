@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/GITHUB_USER/homebrew-kue-ball.git"
+    "url": "https://github.com/paperschool/homebrew-kue-ball.git"
   },
   "type": "module",
   "bin": {

@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.0 — 2026-05-26
+
+- Helm command group now exposes "List pending Helm releases" and "List failed Helm releases" for quick triage of stuck deployments.
+
 ## v1.2.0 — 2026-05-26
 
 - New `step()` chrome helper renders titled wizard pages with a clean content area; context picker, namespace picker, and Azure refresh now use it.

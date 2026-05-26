@@ -18,6 +18,28 @@ export function buildHelmCommands(ctx, ns) {
     },
     {
       group: "Helm",
+      name: `List pending Helm releases  ${DIM}(${ns})${RESET}`,
+      run: async () => {
+        if (!isHelmAvailable()) {
+          warn("helm not found — install it with: brew install helm");
+          return;
+        }
+        await runLive("helm", ["list", "--pending", "--namespace", ns, "--kube-context", ctx]);
+      },
+    },
+    {
+      group: "Helm",
+      name: `List failed Helm releases  ${DIM}(${ns})${RESET}`,
+      run: async () => {
+        if (!isHelmAvailable()) {
+          warn("helm not found — install it with: brew install helm");
+          return;
+        }
+        await runLive("helm", ["list", "--failed", "--namespace", ns, "--kube-context", ctx]);
+      },
+    },
+    {
+      group: "Helm",
       name: `Delete a Helm release  ${DIM}(${ns})${RESET}`,
       run: async () => {
         if (!isHelmAvailable()) {

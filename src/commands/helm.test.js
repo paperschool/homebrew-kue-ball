@@ -34,9 +34,9 @@ beforeEach(() => {
 });
 
 describe("buildHelmCommands", () => {
-  it("returns 2 commands all with group 'Helm'", () => {
+  it("returns 4 commands all with group 'Helm'", () => {
     const cmds = buildHelmCommands(CTX, NS);
-    expect(cmds).toHaveLength(2);
+    expect(cmds).toHaveLength(4);
     expect(cmds.every((c) => c.group === "Helm")).toBe(true);
   });
 });

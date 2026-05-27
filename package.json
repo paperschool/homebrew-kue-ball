@@ -1,6 +1,6 @@
 {
   "name": "kue-ball",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "Interactive kubectl wizard CLI — context/namespace/pod/log management for AKS clusters",
   "license": "MIT",
   "repository": {
@@ -15,7 +15,8 @@
     "start": "node src/main.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "docker:start": "bash scripts/docker-start.sh"
   },
   "dependencies": {
     "@inquirer/core": "^11.1.10",

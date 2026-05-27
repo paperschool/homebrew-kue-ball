@@ -1,0 +1,55 @@
+# Ubuntu 22.04 amd64 image that approximates a WSL2 Ubuntu environment, used by
+# `npm run docker:start` to test kue-ball's "Windows via WSL2" install path on a
+# Mac without needing an actual Windows machine.
+#
+# Forces linux/amd64 so it matches real WSL (which is always amd64 on Windows);
+# on Apple Silicon this runs under Rosetta-style emulation — slower but faithful.
+#
+# Coverage: catches POSIX-isms, install-step typos, the Linux platform branch in
+# shell.js, and most of the TUI rendering. Does NOT cover Windows Terminal-specific
+# quirks or WSL ↔ Windows filesystem boundary issues — those still need real Windows.
+
+FROM --platform=linux/amd64 ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Base toolchain
+RUN apt-get update && apt-get install -y \
+        ca-certificates \
+        curl \
+        gnupg \
+        jq \
+        lsb-release \
+        unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node ≥ 22 via NodeSource
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# kubectl (latest stable)
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl \
+    && rm kubectl
+
+# kubelogin — needed for AAD-integrated AKS clusters; without it, kubectl returns
+# "exec plugin: invalid apiVersion" when calling against an AAD-protected cluster.
+RUN curl -LO "https://github.com/Azure/kubelogin/releases/latest/download/kubelogin-linux-amd64.zip" \
+    && unzip -q kubelogin-linux-amd64.zip \
+    && install -o root -g root -m 0755 bin/linux_amd64/kubelogin /usr/local/bin/kubelogin \
+    && rm -rf kubelogin-linux-amd64.zip bin/
+
+# helm
+RUN curl -sS https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# az CLI (Microsoft official installer)
+RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+
+# Quality-of-life: kue-ball uses the rotating splash + box-drawing glyphs which
+# render correctly only if locale supports UTF-8. Ubuntu base image is C.UTF-8
+# by default — leave it.
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+
+WORKDIR /app
+CMD ["bash"]

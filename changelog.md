@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.0.4 — 2026-05-27
+
+- New `npm run docker:start` builds and runs kue-ball inside an Ubuntu 22.04 amd64 container with Node 22 + kubectl + kubelogin + helm + az + jq pre-installed. Mounts the repo, `~/.kube`, and `~/.azure` so you can hit real clusters from inside the container. Lets a Mac dev approximate the WSL2 Ubuntu environment for Epic 7 smoke testing without a Windows box (~70% coverage; misses Windows Terminal-specific quirks).
+- New `Dockerfile.wsl-test` at the repo root defines the test image; `scripts/docker-start.sh` is the entrypoint that auto-builds on first run and uses a named volume for `node_modules` so the Linux build doesn't clobber the host's macOS one.
+
 ## v2.0.3 — 2026-05-27
 
 - Streaming logs (`Stream logs`, `Previous container logs`) now suspends the chrome's alternate-screen buffer during the stream and restores it on exit, so the terminal's native scrollback (mouse wheel, Cmd+scroll, etc.) works while streaming. Arrow keys no longer trigger exit — only bare ESC / `q` / `Q` / Ctrl+C do.

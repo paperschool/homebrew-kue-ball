@@ -20,19 +20,19 @@ const CMD_MAX_LINES = 3; // cap on wrapped command lines so the header can't dom
 const RESIZE_DEBOUNCE_MS = 80; // coalesce the burst of resize events fired during a drag
 
 // ── Chrome colour palette ────────────────────────────────────────────────────
-const C_BAR_BG   = "\x1b[48;5;24m";           // bars bg: dark steel blue (#005f87)
-const C_APP      = "\x1b[1;97m";              // app name: bold bright white
-const C_SEP      = "\x1b[0;48;5;24;38;5;75m"; // separator ·: reset + reapply bg + sky blue
-const C_CTX      = "\x1b[38;5;81m";           // context name: light cyan
-const C_NS       = "\x1b[38;5;117m";          // namespace: light periwinkle
+const C_BAR_BG = "\x1b[48;5;24m";           // bars bg: dark steel blue (#005f87)
+const C_APP = "\x1b[1;97m";              // app name: bold bright white
+const C_SEP = "\x1b[0;48;5;24;38;5;75m"; // separator ·: reset + reapply bg + sky blue
+const C_CTX = "\x1b[38;5;81m";           // context name: light cyan
+const C_NS = "\x1b[38;5;117m";          // namespace: light periwinkle
 const C_BAR_TEXT = "\x1b[38;5;252m";          // status bar text: near-white
-const C_LABEL    = "\x1b[38;5;110m";          // muted label (ctx:/ns:) on the title bar
-const C_CMD      = "\x1b[38;5;75m";           // last-command detail: the actual command (light blue)
-const C_DIV      = "\x1b[38;5;239m";          // divider lines: dark grey
-const C_RESET    = "\x1b[0m";                 // full attribute reset
-const C_PROG_ON  = "\x1b[38;5;51m";           // progress bar: moving block (bright cyan)
+const C_LABEL = "\x1b[38;5;110m";          // muted label (ctx:/ns:) on the title bar
+const C_CMD = "\x1b[38;5;75m";           // last-command detail: the actual command (light blue)
+const C_DIV = "\x1b[38;5;239m";          // divider lines: dark grey
+const C_RESET = "\x1b[0m";                 // full attribute reset
+const C_PROG_ON = "\x1b[38;5;51m";           // progress bar: moving block (bright cyan)
 const C_PROG_OFF = "\x1b[38;5;60m";           // progress bar: track (muted slate)
-const C_ART_FRONT  = "\x1b[1;97m";            // splash art: byline (flat bold bright white)
+const C_ART_FRONT = "\x1b[1;97m";            // splash art: byline (flat bold bright white)
 const C_ART_SHADOW = "\x1b[38;5;75m";         // splash art: bottom-right depth/edges (light blue)
 
 // Letter-face gradient — four tiers stepping from white into progressively saturated blue.
@@ -406,7 +406,7 @@ export function setAuthStatus(status) {
 
 export function setContextInfo(ctx, ns) {
     ctxName = ctx ? truncate(ctx, 22) : "";
-    nsName  = ns  ? truncate(ns,  18) : "";
+    nsName = ns ? truncate(ns, 18) : "";
     if (!active) return;
     w("\x1b[s");
     drawTitle();
@@ -440,9 +440,9 @@ export function setLastCommandRun(text) {
 // Map a normalized position t ∈ [0,1] to one of the four gradient bands ({glyph, color}).
 // Bands are slightly biased toward solid █ so the leading edge reads as a clean block.
 function _gradientBand(t) {
-    if (t < 0.3)  return GRADIENT_BANDS[0]; // ░ + bright white   — sparse end
+    if (t < 0.3) return GRADIENT_BANDS[0]; // ░ + bright white   — sparse end
     if (t < 0.55) return GRADIENT_BANDS[1]; // ▒ + pale blue
-    if (t < 0.8)  return GRADIENT_BANDS[2]; // ▓ + light periwinkle
+    if (t < 0.8) return GRADIENT_BANDS[2]; // ▓ + light periwinkle
     return GRADIENT_BANDS[3];                // █ + light blue      — solid end
 }
 
@@ -638,10 +638,10 @@ export async function showAuthErrorPage(errorOutput) {
     // Small ASCII warning triangle — each row is its own independent centre line,
     // so the slashes form a proper triangle widening from the apex.
     const warningArt = [
-        "/\\",
-        "/  \\",
-        "/ !! \\",
-        "‾‾‾‾‾‾",
+        "/█\\",
+        "/ █ \\",
+        "/  •  \\",
+        "‾‾‾‾‾‾‾",
     ];
     const header = "Authentication / Permission Error";
     const dismiss = "Press any key to return.";

@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.0.0 — 2026-05-27
+
+**Resource × Verb menu redesign.** The flat command list is gone; the wizard now navigates by resource type first, then verb. A single resource registry drives the menu, so adding a new kubernetes resource is a one-line entry rather than a bespoke command module.
+
+- **Two-level menu.** Pick a resource (Pods, Deployments, ConfigMaps, Nodes, PVCs, etc.), then pick an action. Backspace or `←` steps back. Verb labels are colour-coded: red `delete`, yellow `edit`, blue `logs*`, green `exec*`.
+- **17 registered resources** across Workloads / Config / Networking / Cluster / Storage. Cluster-scoped resources auto-omit `--namespace` from every kubectl call.
+- **4 universal verbs** (list / describe / edit / delete) and **21 specific verbs** (logs, exec, scale, full rollout family, port-forward, set image/env, top, cordon/drain/taint, triggerNow). Press `e` in the describe pager to launch `kubectl edit`.
+- **Authentication error page** — when kubectl fails with Forbidden / 401 / 403 / etc., a yellow warning page replaces the raw stderr with a clear "are you logged into Azure, PIM activated, on the correct network?" prompt.
+- **TUI polish** — splash with a slowly revolving white→blue gradient, anchored search bar, prereq output locked to the bottom of the screen.
+- Removed 20 legacy `src/commands/*` modules in favour of the registry + universal/specific verb libraries; Helm, Ping, Events, and Contexts preserved as top-level extras.
+
 ## v1.13.2 — 2026-05-27
 
 - Rewrote `.github/prompts/version-and-commit.prompt.md` to pick the right Conventional Commits type per change (feat / fix / refactor / style / perf / test / docs / chore) instead of always using `chore(release):`.

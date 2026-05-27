@@ -69,20 +69,99 @@ Or add an alias to your shell profile:
 alias kube-myapp='KUBECTL_WIZARD_APP=my-service KUBECTL_WIZARD_NAMESPACE=my-ns kue-ball'
 ```
 
-## Features
+## How it works
 
-- **Fuzzy search** across all commands
-- **Pods** — list, describe, delete
-- **Logs** — stream (with Esc/q to exit), dump to file, previous container logs
-- **Deployments** — list, describe, rollout status/history, rollback, restart, delete
-- **Services & Ingress** — list/delete services, service accounts, ingresses, VirtualServices
-- **Config** — list/inspect ConfigMaps, list secrets
-- **Events** — recent events, warnings only
-- **Resources** — `top pods`, `top nodes`
+`kue-ball` uses a **two-level menu**: pick a resource type, then pick the action you want to perform on it. Every picker is fuzzy-searchable. Backspace or `←` steps back to the previous menu.
+
+```
+  Resource picker            Verb picker (per resource)
+  ─────────────────          ──────────────────────────
+  Pods                  →    List
+  Deployments                Describe        (e to edit in the pager)
+  ReplicaSets                Delete          (confirms first)
+  ConfigMaps                 Stream logs
+  Secrets                    Shell into pod
+  Nodes                      Scale
+  PVCs                       …
+  …                          ← Back to resources
+  Helm
+  Ping
+  Events
+  Contexts
+  Exit
+```
+
+The same verb (e.g. `delete`) works against every resource that supports it — no per-resource menu to remember.
+
+### Resources
+
+17 kubernetes resources are registered out of the box, grouped by domain:
+
+| Group | Resources |
+|---|---|
+| **Workloads** | Pods, Deployments, ReplicaSets, StatefulSets, DaemonSets, Jobs, CronJobs |
+| **Config** | ConfigMaps, Secrets |
+| **Networking** | Services, Ingress, ServiceAccounts, VirtualServices |
+| **Cluster** | Nodes |
+| **Storage** | HPA, PVCs, PVs |
+
+Cluster-scoped resources (Nodes, PVs) automatically omit `--namespace` from every kubectl call.
+
+### Verbs
+
+**Universal verbs** work against any registered resource:
+
+| Verb | What it does |
+|---|---|
+| `list` | `kubectl get {plural} -o wide` |
+| `describe` | `kubectl describe {kind} {name}` — press `e` in the pager to launch `kubectl edit` |
+| `edit` | `kubectl edit {kind} {name}` (honours `KUBE_EDITOR`, defaults to `nano`) |
+| `delete` | `kubectl delete {kind} {name}` (confirms first) |
+
+**Specific verbs** cover the resource-flavoured actions:
+
+- `logs`, `logsPrevious`, `logsToFile` — stream / dump / save container logs (Pods + Jobs)
+- `exec`, `execOneOff` — interactive shell or one-off command in a Pod
+- `scale` — set replicas (Deployments / ReplicaSets / StatefulSets; confirms when scaling to 0)
+- `rolloutStatus`, `rolloutHistory`, `rolloutUndo`, `rolloutRestart`, `rolloutPause`, `rolloutResume`
+- `setImage`, `setEnv` — apply `kubectl set image` / `kubectl set env`
+- `top` — resource usage (Pods, Nodes)
+- `portForward` — `kubectl port-forward` with `q`/Esc to quit
+- `triggerNow` — instantiate a Job from a CronJob
+- `cordon`, `uncordon`, `drain`, `taint` — node lifecycle
+
+Verb labels are colour-coded by intent: red `delete`, yellow `edit`, blue `logs*`, green `exec*`.
+
+### Top-level extras
+
+Alongside the resource picker, four items handle non-resource flows:
+
+- **Helm** — list / delete releases, list pending or failed releases
+- **Ping** — auto-discovers routes from Ingress / VirtualService and HTTP-pings them
+- **Events** — recent events in the namespace, warnings only
 - **Contexts** — refresh from Azure (`az aks get-credentials`), list, switch, change namespace
-- **Exec** — interactive shell into a pod, one-off commands
-- **Helm** — list/delete releases
-- **Ping** — auto-discovers routes from Ingress/VirtualService and pings them
+
+### Authentication error page
+
+When a `kubectl` command fails with a permission / auth error (Forbidden, Unauthorized, 401/403, access denied, etc.), the wizard shows a yellow warning page instead of the raw stderr — with the salient error line and a prompt to check Azure login, PIM activation, and network connectivity.
+
+### Adding a new resource
+
+Adding a kubernetes resource to the wizard is a single registry entry in `src/lib/resources.js`:
+
+```js
+{
+    kind: "poddisruptionbudget",
+    plural: "poddisruptionbudgets",
+    displayName: "PDBs",
+    group: "Cluster",
+    namespaced: true,
+    universalVerbs: ["list", "describe", "edit", "delete"],
+    specificVerbs: [],
+}
+```
+
+The two-level menu picks it up automatically. No new command handler required.
 
 ## Subscription preferences
 

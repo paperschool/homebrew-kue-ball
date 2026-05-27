@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.0.3 — 2026-05-27
+
+- Streaming logs (`Stream logs`, `Previous container logs`) now suspends the chrome's alternate-screen buffer during the stream and restores it on exit, so the terminal's native scrollback (mouse wheel, Cmd+scroll, etc.) works while streaming. Arrow keys no longer trigger exit — only bare ESC / `q` / `Q` / Ctrl+C do.
+- `Dump logs to file` now holds an interstitial showing the saved path until the user presses any key. Previously the path message was wiped by the next menu render and the user had no idea where the file went.
+- Pod `delete` now appends `--timeout=10s` so the menu returns quickly even when `terminationGracePeriodSeconds` (or a stuck finalizer) would otherwise hang the call. The confirm prompt also notes that pods are declarative — the controller recreates them immediately, so "delete pod" is effectively a restart. Non-pod deletes are unchanged.
+
 ## v2.0.2 — 2026-05-27
 
 - New Epic 7 in `planning-artifacts/epics.md`: **Windows Support via WSL2**. Adds FR17 / FR18 / FR19 (WSL install, README docs, defensive PATH handling), NFR8 (native Windows console explicitly out of scope), and three stories.

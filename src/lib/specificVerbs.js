@@ -118,8 +118,18 @@ export const SPECIFIC_VERBS = {
             const jqPipe = isJqAvailable() ? " | jq -R -r 'try (fromjson | .) catch .'" : "";
             const shellCmd = `mkdir -p ${dir} && kubectl ${flags} logs ${name}${tailFlag}${jqPipe} > ${file}`;
             const code = await runShell(shellCmd);
-            if (code === 0) ok(`Logs saved to ${file}`);
-            else warn(`Command exited with code ${code} — check output above.`);
+            // Interstitial: hold the save-confirmation on screen until the user dismisses.
+            // Without this, the next menu render's clearContent() wipes the ok()/warn() line
+            // and the user has no idea where the file went.
+            if (code === 0) {
+                ok(`Logs saved to ${file}`);
+                info("Press any key to return to the menu.");
+                await waitForKeypress();
+            } else {
+                warn(`Command exited with code ${code} — check output above.`);
+                info("Press any key to return to the menu.");
+                await waitForKeypress();
+            }
         },
     },
 

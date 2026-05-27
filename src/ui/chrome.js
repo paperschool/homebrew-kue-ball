@@ -333,6 +333,39 @@ export function initChrome() {
     active = true;
 }
 
+// Temporarily exit alternate-screen mode so an interactive child process (e.g. `kubectl logs -f`)
+// can use the terminal's NATIVE main buffer — which is the one that has real scrollback. While
+// the chrome is suspended:
+//   - The scroll region is reset (no constrained scrolling).
+//   - The alt-screen is exited (chrome header/status disappear; terminal's main buffer is restored).
+//   - The cursor is made visible (in case it was hidden).
+//   - Splash animation is paused.
+// `active` stays true so other module state survives; resumeChromeAfterStreaming() puts the chrome
+// back on screen by re-entering alt-screen and re-rendering every structural row from scratch.
+export function suspendChromeForStreaming() {
+    if (!active) return;
+    _splashVisible = false;
+    resetScrollRegion();
+    w("\x1b[?25h"); // show cursor
+    w("\x1b[?1049l"); // exit alt-screen — terminal restores its main buffer (scrollback available)
+}
+
+export function resumeChromeAfterStreaming() {
+    if (!active) return;
+    w("\x1b[?1049h"); // re-enter alt-screen (fresh empty buffer)
+    w("\x1b[?25l"); // hide cursor again
+    drawTitle();
+    drawDivider();
+    _drawLastCommandBlock();
+    _drawSearchBar();
+    _drawLastCmdDivider();
+    moveTo(rows(), 1);
+    w(C_BAR_BG + "\x1b[2K" + C_RESET);
+    _renderStatusBar();
+    setScrollRegion();
+    moveTo(_contentStart(), 1);
+}
+
 export function destroyChrome() {
     if (!active) return;
     active = false;

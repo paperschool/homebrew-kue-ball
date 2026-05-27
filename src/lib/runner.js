@@ -1,7 +1,7 @@
 import { run, captureCommand, spawnInteractive, spawnInteractiveCapturingStderr, spawnInteractiveWithExitKeys } from "./shell.js";
 import { info, DIM, RESET, BOLD } from "./output.js";
 import { isPermissionError } from "./azure.js";
-import { startProgress, stopProgress, setLastCommandRun, showAuthErrorPage } from "../ui/chrome.js";
+import { startProgress, stopProgress, setLastCommandRun, showAuthErrorPage, suspendChromeForStreaming, resumeChromeAfterStreaming } from "../ui/chrome.js";
 import { pageOutput } from "../ui/pager.js";
 
 export const RETURN_TO_MENU = "return-to-menu";
@@ -132,7 +132,16 @@ export async function runLivePipedWithExitKeys(cmd, args) {
         ? `${cmdStr} | jq -R -r 'try (fromjson | .) catch .'`
         : cmdStr;
     setLastCommandRun(piped);
-    info("Press Esc or q to return to the command menu.");
-    await _spawnWithProgress(() => spawnInteractiveWithExitKeys("sh", ["-c", piped]));
+    // Drop out of the chrome's alternate-screen buffer so the terminal's NATIVE main buffer
+    // (with real scrollback) is used while streaming. Without this, the alt-screen has no
+    // scrollback by design and the user can't review log lines that have scrolled off-screen.
+    // Chrome is restored on exit — see resumeChromeAfterStreaming().
+    suspendChromeForStreaming();
+    process.stdout.write("\n  Press Esc or q to return to the menu.\n\n");
+    try {
+        await spawnInteractiveWithExitKeys("sh", ["-c", piped]);
+    } finally {
+        resumeChromeAfterStreaming();
+    }
     return RETURN_TO_MENU;
 }

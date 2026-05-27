@@ -166,7 +166,7 @@ describe("UNIVERSAL_VERBS.delete", () => {
         expect(runLive).not.toHaveBeenCalled();
     });
 
-    it("calls runLive with delete kind name when confirmed", async () => {
+    it("calls runLive with delete kind name + --timeout=10s when confirmed on a Pod", async () => {
         resourcePicker.mockResolvedValueOnce("my-pod");
         confirm.mockResolvedValueOnce(true);
         await UNIVERSAL_VERBS.delete.handler(podsResource, CTX, NS);
@@ -176,7 +176,38 @@ describe("UNIVERSAL_VERBS.delete", () => {
             "delete",
             "pod",
             "my-pod",
+            "--timeout=10s",
         ]);
+    });
+
+    it("does NOT add --timeout for non-pod resources (deployments etc. legitimately take longer)", async () => {
+        const deploymentResource = { ...podsResource, kind: "deployment", plural: "deployments", displayName: "Deployments" };
+        resourcePicker.mockResolvedValueOnce("web");
+        confirm.mockResolvedValueOnce(true);
+        await UNIVERSAL_VERBS.delete.handler(deploymentResource, CTX, NS);
+        const [, args] = runLive.mock.calls[0];
+        expect(args).not.toContain("--timeout=10s");
+        expect(args.some((a) => String(a).startsWith("--timeout"))).toBe(false);
+    });
+
+    it("for a Pod, the confirm message warns that the controller will recreate it", async () => {
+        resourcePicker.mockResolvedValueOnce("my-pod");
+        confirm.mockResolvedValueOnce(false);
+        await UNIVERSAL_VERBS.delete.handler(podsResource, CTX, NS);
+        expect(confirm).toHaveBeenCalledWith(
+            expect.objectContaining({
+                message: expect.stringMatching(/declarative|controller recreates/i),
+            }),
+        );
+    });
+
+    it("for non-Pod resources, the confirm message has no declarative warning", async () => {
+        const deploymentResource = { ...podsResource, kind: "deployment", plural: "deployments", displayName: "Deployments" };
+        resourcePicker.mockResolvedValueOnce("web");
+        confirm.mockResolvedValueOnce(false);
+        await UNIVERSAL_VERBS.delete.handler(deploymentResource, CTX, NS);
+        const [{ message }] = confirm.mock.calls[0];
+        expect(message).not.toMatch(/declarative|controller recreates/i);
     });
 
     it("confirm is called with default: false", async () => {

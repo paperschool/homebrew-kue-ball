@@ -118,7 +118,12 @@ export function spawnInteractiveWithExitKeys(cmd, args) {
 
         const onStdinData = (buf) => {
             const key = buf.toString("utf8");
-            if (key === "\u0003" || key.startsWith("\u001b") || key === "q" || key === "Q") {
+            // Exit keys: Ctrl+C ("\u0003"), bare ESC ("\u001b" as a single byte —
+            // NOT a CSI sequence like arrow keys "\u001b[A" or scroll-wheel escapes),
+            // and q / Q. We must NOT treat any escape-prefixed input as exit — that
+            // catches arrow keys and blocks scrolling back through streamed log output.
+            const isBareEsc = key === "\u001b";
+            if (key === "\u0003" || isBareEsc || key === "q" || key === "Q") {
                 stopProc();
                 return;
             }

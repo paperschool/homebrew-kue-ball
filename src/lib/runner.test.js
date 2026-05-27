@@ -19,6 +19,8 @@ vi.mock("../ui/chrome.js", () => ({
     stopProgress: vi.fn(),
     setLastCommandRun: vi.fn(),
     showAuthErrorPage: vi.fn().mockResolvedValue(undefined),
+    suspendChromeForStreaming: vi.fn(),
+    resumeChromeAfterStreaming: vi.fn(),
 }));
 
 vi.mock("./azure.js", () => ({

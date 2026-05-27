@@ -115,17 +115,27 @@ export const UNIVERSAL_VERBS = {
             const name = await pickResourceInstance(resource, ctx, ns);
             if (!name) return;
             const where = resource.namespaced ? ` in namespace "${ns}"` : "";
-            const sure = await confirm({
-                message: `Delete ${resource.kind} "${name}"${where}?`,
-                default: false,
-            });
+            // Pods are a special case: they're declarative — the deployment / replicaset
+            // recreates them immediately. Surface that in the confirm so the user knows
+            // "delete pod" is really "restart pod, not remove it permanently".
+            const isPod = resource.kind === "pod";
+            const message = isPod
+                ? `Delete pod "${name}"${where}? (pods are declarative — the controller recreates them)`
+                : `Delete ${resource.kind} "${name}"${where}?`;
+            const sure = await confirm({ message, default: false });
             if (!sure) return;
-            await runLive("kubectl", [
+            const args = [
                 ...baseArgs(resource, ctx, ns),
                 "delete",
                 resource.kind,
                 name,
-            ]);
+            ];
+            // For pods, cap kubectl's wait at 10s so the menu returns quickly even when
+            // terminationGracePeriodSeconds (or a stuck finalizer) would otherwise hang
+            // the call. The delete is still in flight on the cluster side; kubectl just
+            // doesn't block waiting for the watch to confirm removal.
+            if (isPod) args.push("--timeout=10s");
+            await runLive("kubectl", args);
         },
     },
 };

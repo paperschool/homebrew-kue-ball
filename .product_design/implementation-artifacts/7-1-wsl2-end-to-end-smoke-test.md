@@ -70,11 +70,11 @@ so that I know which (if any) flows behave differently from the Mac baseline bef
   - [ ] Hit Ctrl+C at the resource picker. The wizard exits with "Cancelled." printed; the parent shell prompt returns to the row where kue-ball started (alternate screen buffer restored).
   - [ ] Re-run kue-ball, navigate into a verb picker, hit Ctrl+C. Same clean exit.
 
-- [ ] **Task 8: Capture caveats** (AC: #8)
-  - [ ] Create `docs/wsl2-known-caveats.md`.
-  - [ ] Header: terminal app + version (e.g. "Windows Terminal 1.18.x"), Ubuntu release (e.g. "Ubuntu 22.04 LTS via WSL2"), tool versions (node, kubectl, helm, az).
-  - [ ] One section per observed deviation, each with: title, repro steps, observed behaviour, expected behaviour (the Mac baseline), and (if known) the underlying cause.
-  - [ ] If no deviations: a single line `No known caveats as of YYYY-MM-DD.`
+- [x] **Task 8: Capture caveats** (AC: #8) *(partially complete — file created with Docker-proxy findings; real-WSL caveats deferred to a Windows-host user)*
+  - [x] Create `docs/wsl2-known-caveats.md`.
+  - [x] Header: terminal app + version (e.g. "Windows Terminal 1.18.x"), Ubuntu release (e.g. "Ubuntu 22.04 LTS via WSL2"), tool versions (node, kubectl, helm, az). *(file has sections for Docker proxy + real-WSL; real-WSL versions remain to be filled by the empirical run)*
+  - [x] One section per observed deviation, each with: title, repro steps, observed behaviour, expected behaviour (the Mac baseline), and (if known) the underlying cause. *(template/instructions in place; no real-WSL deviations to record yet)*
+  - [x] If no deviations: a single line `No known caveats as of YYYY-MM-DD.` *(present)*
 
 ## Dev Notes
 
@@ -139,8 +139,29 @@ docs/
 
 ### Agent Model Used
 
+claude-opus-4-7 (1M context)
+
 ### Debug Log References
+
+None.
 
 ### Completion Notes List
 
+- **Status: PARTIALLY COMPLETE — empirical smoke test deferred to a Windows-host user.** I have no access to a Windows + WSL2 + AKS environment from this dev session. Tasks 1–7 of this story are by definition empirical and cannot be marked done from a Mac. They remain unchecked.
+- **What WAS done**: Task 8 (`docs/wsl2-known-caveats.md`) is created with the documented structure and a placeholder "No known caveats as of 2026-05-27." The file has three sections:
+  1. **Verified** — Mac/Docker proxy findings (Linux code path of `shell.js`, splash + chrome rendering, prereq checks, resource picker fuzzy + back-nav, auth-error page, `exec` Forbidden detection — all confirmed working in the `npm run docker:start` container).
+  2. **Not yet verified** — explicit list of items that require a real Windows host: Windows Terminal-specific rendering, WSL ↔ Windows fs boundary, WSL TTY quirks (setRawMode, Ctrl+C, mouse-wheel scrollback under chrome's alt-screen toggle), resize handling, `az login` flow under WSL, kubeconfig portability.
+  3. **Caveats** — empty for now; format documented for the user to fill in after the real WSL run.
+- **How to actually do the real-WSL smoke test**: walk every bullet in Tasks 1–7 on a Win 11 host. The detailed checklist in this story file IS the test plan. Findings go into `docs/wsl2-known-caveats.md`.
+- **Story status stays `review`** in the sprint-status (NOT `done`) so it's clear to anyone reading the sprint that the real-Windows verification is pending. Move to `done` only after Tasks 1–7 are actually ticked off.
+- **Cross-story note**: Story 7-3 (PATH refactor) was implemented in the same Epic 7 run; its changes are independent and don't change anything that would invalidate the Docker-proxy verifications captured here.
+
 ### File List
+
+- `docs/wsl2-known-caveats.md` (NEW — placeholder + Docker-proxy verified section + pending list)
+- `.product_design/implementation-artifacts/sprint-status.yaml` (status: ready-for-dev → in-progress → review-pending-empirical)
+- `.product_design/implementation-artifacts/7-1-wsl2-end-to-end-smoke-test.md` (this file — Task 8 checked; Tasks 1–7 honestly left unchecked pending real-WSL run)
+
+### Change Log
+
+- 2026-05-27 — Partial implementation. Created `docs/wsl2-known-caveats.md` with the documented structure + Docker-proxy verification of the Linux code path. Tasks 1–7 (the empirical Windows-host smoke test) remain UNCHECKED and require a user with WSL2 + AKS access to complete.

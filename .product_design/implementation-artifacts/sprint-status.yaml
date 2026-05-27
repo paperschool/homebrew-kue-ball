@@ -105,8 +105,8 @@ development_status:
   epic-6-retrospective: optional
 
   # Epic 7 — Windows Support via WSL2
-  epic-7: backlog
-  7-1-wsl2-end-to-end-smoke-test: ready-for-dev
-  7-2-readme-windows-install-path-via-wsl2: ready-for-dev
-  7-3-defensive-cross-platform-path-handling-in-shell-js: ready-for-dev
+  epic-7: in-progress
+  7-1-wsl2-end-to-end-smoke-test: in-progress  # placeholder caveats file shipped; real Windows smoke test still pending
+  7-2-readme-windows-install-path-via-wsl2: review
+  7-3-defensive-cross-platform-path-handling-in-shell-js: review
   epic-7-retrospective: optional

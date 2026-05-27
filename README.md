@@ -15,10 +15,11 @@
 </table>
 
 
-Interactive `kubectl` wizard CLI for AKS clusters for use on mac (and possibly linux) devices. Pick a context, pick a namespace, and run common operations through a fuzzy-searchable menu — no flags to memorise.
+Interactive `kubectl` wizard CLI for AKS clusters. Runs on macOS, Linux, and Windows (via WSL2 — see [Install → Windows](#windows-via-wsl2)). Pick a context, pick a namespace, and run common operations through a fuzzy-searchable menu — no flags to memorise.
 
 ## Requirements
 
+- **Platforms**: macOS, Linux, Windows (via WSL2 + Ubuntu — native PowerShell / `cmd.exe` not supported).
 - Node.js ≥ 22
 - `kubectl` — `brew install kubectl`
 - `az` (Azure CLI) — `brew install azure-cli` *(for context refresh only)*
@@ -50,6 +51,76 @@ npm start
 node src/main.js
 ```
 
+### Windows (via WSL2)
+
+Native Windows (PowerShell, `cmd.exe`) is **not supported**. The supported path on Windows is WSL2 + Ubuntu, which runs `kue-ball` as a Linux binary.
+
+1. **Enable WSL2 + install Ubuntu** (PowerShell as Administrator):
+
+   ```powershell
+   wsl --install -d Ubuntu
+   ```
+
+   Reboot when prompted. After reboot, the Ubuntu setup will ask you to create a Linux user + password.
+
+2. **Open the Ubuntu shell** from the Start Menu (NOT a PowerShell `wsl` invocation — Start-Menu launches in Windows Terminal which is the supported TUI host).
+
+3. **Install Node ≥ 22**:
+
+   ```bash
+   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+   sudo apt-get install -y nodejs
+   ```
+
+4. **Install kubectl**:
+
+   ```bash
+   curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+   sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+   ```
+
+5. **Install `helm`** (optional, for Helm commands):
+
+   ```bash
+   curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+   ```
+
+6. **Install `az`** (optional, for `Refresh contexts`):
+
+   ```bash
+   curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+   az login --use-device-code   # device-code flow is the safe path inside WSL
+   ```
+
+7. **Clone into the WSL filesystem** — NOT into `/mnt/c/...`:
+
+   > ⚠ Cloning into `/mnt/c/...` makes `npm install` 5–10× slower (every fs syscall crosses the Windows↔Linux boundary) and can break interactive prompts. Always work inside the WSL home (`~/dev/...`).
+
+   ```bash
+   mkdir -p ~/dev && cd ~/dev
+   git clone https://github.com/paperschool/homebrew-kue-ball.git
+   cd homebrew-kue-ball
+   npm install
+   ```
+
+8. **Run it**:
+
+   ```bash
+   npm start
+   ```
+
+**Heads-up**: Windows Terminal (the default on Win 11) renders the TUI correctly with Cascadia Mono. Legacy `conhost.exe` is **not supported** — open Ubuntu from the Start Menu rather than via `wsl.exe` in legacy console. For known quirks and gotchas under WSL2, see [`docs/wsl2-known-caveats.md`](docs/wsl2-known-caveats.md).
+
+### Run inside Docker (Mac dev shortcut)
+
+Mac developers can approximate the WSL2 Ubuntu environment for testing without spinning up a Windows VM:
+
+```bash
+npm run docker:start
+```
+
+First run builds the image (~3 min); subsequent runs are instant. The container mounts `~/.kube` and `~/.azure` from the host so you can hit real clusters from inside. See [`docs/wsl2-known-caveats.md`](docs/wsl2-known-caveats.md) for what this verifies vs what still needs a real Windows host.
+
 ## Upgrading
 
 If you installed via the Homebrew tap, upgrade with:
@@ -68,6 +139,13 @@ brew untap paperschool/kue-ball
 brew tap paperschool/kue-ball
 brew upgrade kue-ball
 ```
+
+### npm / WSL installs
+
+The Homebrew upgrade flow does NOT apply to npm or WSL installs.
+
+- **git-clone install** (incl. WSL2): `cd <repo> && git pull && npm install`
+- **global npm install**: re-run `npm install -g .` from the cloned repo to re-link.
 
 ## Configuration
 

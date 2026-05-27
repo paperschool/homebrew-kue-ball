@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.0.8 — 2026-05-27
+
+- README gets a "Windows (via WSL2)" install subsection (Story 7-2) with the full 8-step setup, a prominent footgun warning to clone into `~/dev/...` not `/mnt/c/...`, the Windows Terminal note, and a link to `docs/wsl2-known-caveats.md`. Also a new "Run inside Docker (Mac dev shortcut)" subsection pointing at `npm run docker:start`. Intro + Requirements + Upgrading sections all updated to call out Windows-via-WSL2 as supported.
+- New `docs/wsl2-known-caveats.md` (Story 7-1, partial) — placeholder caveats file with Docker-proxy verifications documented and explicit "not yet verified" list for items still needing a real Windows + WSL2 host. Story 7-1 stays `in-progress` until someone with a Windows box walks Tasks 1-7 of the smoke test plan.
+- sprint-status updates: Story 7-2 → review, Story 7-3 → review, Story 7-1 stays in-progress with a note. Epic 7 → in-progress.
+
 ## v2.0.7 — 2026-05-27
 
 - `src/lib/shell.js` `buildEnv()` is now platform-aware via `os.platform()` and `path.delimiter` (Story 7-3). On `darwin` it still prepends `~/.rd/bin` + `/opt/homebrew/bin` + `/usr/local/bin` (unchanged). On `linux` (incl. WSL2 Ubuntu) it prepends only `/usr/local/bin` — no dead Mac paths. On `win32` it returns `process.env` unchanged. Self-contained refactor; +3 tests (376 total).

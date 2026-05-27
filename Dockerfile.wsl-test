@@ -44,11 +44,18 @@ RUN ARCH=$(dpkg --print-architecture) \
 # kubelogin (needed for AAD-integrated AKS clusters; without it kubectl errors
 # with "exec plugin: invalid apiVersion" against AAD-protected clusters).
 # kubelogin releases ship linux-amd64 and linux-arm64 archives.
+#
+# CRITICAL: extract in /tmp — the zip contains a top-level `bin/linux_<arch>/`
+# directory. Unzipping in / would create /bin/linux_<arch>/, and the subsequent
+# `rm -rf bin/` would obliterate the entire /bin directory (including /bin/sh),
+# breaking every subsequent RUN step with a misleading "/bin/sh: no such file"
+# error.
 RUN ARCH=$(dpkg --print-architecture) \
+    && cd /tmp \
     && curl -LO "https://github.com/Azure/kubelogin/releases/latest/download/kubelogin-linux-${ARCH}.zip" \
     && unzip -q "kubelogin-linux-${ARCH}.zip" \
     && install -o root -g root -m 0755 "bin/linux_${ARCH}/kubelogin" /usr/local/bin/kubelogin \
-    && rm -rf "kubelogin-linux-${ARCH}.zip" bin/
+    && rm -rf "/tmp/kubelogin-linux-${ARCH}.zip" /tmp/bin
 
 # helm — official installer auto-detects arch.
 RUN curl -sS https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash

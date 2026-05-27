@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.0.6 — 2026-05-27
+
+- Fixed the **actual** cause of `npm run docker:start` failing with `/bin/sh: no such file or directory`: the kubelogin install step was unzipping from WORKDIR `/`, so the archive's top-level `bin/linux_<arch>/` directory landed under `/bin/`. The subsequent `rm -rf bin/` then wiped `/bin` entirely (including `/bin/sh`), breaking every later RUN. Moved the extraction to `/tmp` so relative paths resolve safely. The previous v2.0.5 platform-flag removal was a non-fix (correct platform handling, but not the root bug).
+
 ## v2.0.5 — 2026-05-27
 
 - Fixed `npm run docker:start` failing mid-build on Apple Silicon with a misleading `/bin/sh: no such file or directory` during the helm install step. Root cause: forcing `linux/amd64` ran the image under Rosetta/QEMU emulation, which flakes on multi-process bash pipes. Dropped the `--platform=linux/amd64` from both `Dockerfile.wsl-test` and the docker run/build commands — now uses the host's native architecture (arm64 on Apple Silicon, amd64 on Intel). The Linux behaviour kue-ball cares about is identical between the two.

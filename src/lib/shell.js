@@ -59,6 +59,30 @@ export function spawnInteractive(cmd, args, { env } = {}) {
     });
 }
 
+// Like spawnInteractive, but pipes stderr (rather than inheriting) so the caller can
+// inspect what was printed. stderr is tee'd back to process.stderr so the user still
+// sees it in real time. Returns { code, stderr }.
+// Used by interactive verbs (e.g. `exec`) that need to post-process kubectl errors
+// (forbidden, container not found, etc.) for the auth-error page.
+export function spawnInteractiveCapturingStderr(cmd, args, { env } = {}) {
+    return new Promise((resolve) => {
+        const proc = spawn(cmd, args, {
+            stdio: ["inherit", "inherit", "pipe"],
+            ...(env && { env }),
+        });
+        let stderr = "";
+        proc.stderr?.on("data", (chunk) => {
+            stderr += chunk;
+            process.stderr.write(chunk);
+        });
+        proc.on("exit", (code) => resolve({ code: code ?? 0, stderr }));
+        proc.on("error", (err) => {
+            warn(err.message);
+            resolve({ code: 1, stderr });
+        });
+    });
+}
+
 export function spawnInteractiveWithExitKeys(cmd, args) {
     return new Promise((resolve) => {
         const proc = spawn(cmd, args, { stdio: ["pipe", "inherit", "inherit"], detached: true });

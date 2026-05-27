@@ -1,4 +1,4 @@
-import { run, captureCommand, spawnInteractive, spawnInteractiveWithExitKeys } from "./shell.js";
+import { run, captureCommand, spawnInteractive, spawnInteractiveCapturingStderr, spawnInteractiveWithExitKeys } from "./shell.js";
 import { info, DIM, RESET, BOLD } from "./output.js";
 import { isPermissionError } from "./azure.js";
 import { startProgress, stopProgress, setLastCommandRun, showAuthErrorPage } from "../ui/chrome.js";
@@ -40,9 +40,20 @@ async function _runCaptured(cmd, args, onEdit) {
     return result.code;
 }
 
-export async function runLive(cmd, args, { interactive = false, onEdit } = {}) {
+export async function runLive(cmd, args, { interactive = false, onEdit, onStderr } = {}) {
     setLastCommandRun([cmd, ...args].join(" "));
-    if (interactive) return spawnInteractive(cmd, args); // interactive shell — streams, owns the screen
+    if (interactive) {
+        // When the caller wants to inspect what the interactive child printed (typically
+        // to catch a "Forbidden" before the menu re-renders and wipes it), capture stderr
+        // alongside the inherited streams. Otherwise fall through to the cheaper inherit-only
+        // spawn so the shell session has no overhead.
+        if (onStderr) {
+            const { code, stderr } = await spawnInteractiveCapturingStderr(cmd, args);
+            onStderr(stderr);
+            return code;
+        }
+        return spawnInteractive(cmd, args);
+    }
     return _runCaptured(cmd, args, onEdit);
 }
 

@@ -571,6 +571,25 @@ export function hideSplash() {
 
 export function getStepHeaderRows() { return _stepHeaderRows; }
 
+// Wait for any keypress. Used to pause before re-rendering the menu so the user can
+// read transient terminal output (e.g. an error printed by an interactive child process
+// that would otherwise be wiped by the next clearContent() / step() call).
+export async function waitForKeypress() {
+    return new Promise((resolve) => {
+        const wasRaw = process.stdin.isRaw === true;
+        const cleanup = () => {
+            process.stdin.off("data", onData);
+            if (!wasRaw && process.stdin.setRawMode) process.stdin.setRawMode(false);
+            process.stdin.pause();
+            resolve();
+        };
+        const onData = () => cleanup();
+        if (!wasRaw && process.stdin.setRawMode) process.stdin.setRawMode(true);
+        process.stdin.resume();
+        process.stdin.on("data", onData);
+    });
+}
+
 // Wipes everything in the content area (between the chrome header and the status bar)
 // and parks the cursor at the top of that region. Used by `step()` to give each wizard
 // page a clean slate so the previous prompt's leftovers don't accumulate down the screen.

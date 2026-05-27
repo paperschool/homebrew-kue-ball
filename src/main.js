@@ -22,11 +22,11 @@ export function buildResourceMenu() {
         value: { type: "resource", resource: r },
     }));
     const extras = [
-        { name: "Helm",     value: { type: "extra", id: "helm" } },
-        { name: "Ping",     value: { type: "extra", id: "ping" } },
-        { name: "Events",   value: { type: "extra", id: "events" } },
-        { name: "Contexts", value: { type: "extra", id: "contexts" } },
-        { name: "Exit",     value: { type: "extra", id: "exit" } },
+        { name: "Helm",                value: { type: "extra", id: "helm" } },
+        { name: "Ping",                value: { type: "extra", id: "ping" } },
+        { name: "Events",              value: { type: "extra", id: "events" } },
+        { name: "Context / Namespace", value: { type: "extra", id: "contexts" } },
+        { name: "Exit",                value: { type: "extra", id: "exit" } },
     ];
     return [...resourceItems, ...extras];
 }
@@ -62,7 +62,7 @@ function buildContextsExtras() {
             run: () => runLive("kubectl", ["config", "get-contexts"]),
         },
         { name: "Switch current context", run: () => "change-context" },
-        { name: "Change namespace",       run: () => "change-namespace" },
+        { name: "Switch namespace",       run: () => "change-namespace" },
     ];
 }
 
@@ -262,7 +262,7 @@ async function main() {
                 if (top.id === "helm")     extraResult = await runLegacySubmenu("Helm",     buildHelmCommands,     context, currentNamespace);
                 if (top.id === "ping")     extraResult = await runLegacySubmenu("Ping",     buildPingCommands,     context, currentNamespace);
                 if (top.id === "events")   extraResult = await runLegacySubmenu("Events",   buildEventsExtras,     context, currentNamespace);
-                if (top.id === "contexts") extraResult = await runLegacySubmenu("Contexts", buildContextsExtras,   context, currentNamespace);
+                if (top.id === "contexts") extraResult = await runLegacySubmenu("Context / Namespace", buildContextsExtras, context, currentNamespace);
             } catch (err) {
                 console.error(`\n  ${RED}✗ ${err.message}${RESET}`);
                 if (isPermissionError(err.message)) showPimReminder();

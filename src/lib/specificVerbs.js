@@ -8,8 +8,10 @@ import {
 } from "./runner.js";
 import { run } from "./shell.js";
 import { pickResourceInstance } from "./universalVerbs.js";
-import { ok, warn } from "./output.js";
+import { isPermissionError } from "./azure.js";
+import { ok, warn, info } from "./output.js";
 import { APP_NAME } from "./env.js";
+import { waitForKeypress, showAuthErrorPage } from "../ui/chrome.js";
 import { select, input, confirm } from "@inquirer/prompts";
 
 // For a Job, the actual logs live on the Pod that the Job spawned. Resolve it via the job-name selector.
@@ -133,11 +135,22 @@ export const SPECIFIC_VERBS = {
                     { name: "bash", value: "bash" },
                 ],
             });
-            await runLive(
+            // Capture stderr so we can detect Forbidden/Unauthorized after the spawn
+            // returns — otherwise the kubectl error gets wiped by the next menu render.
+            let capturedStderr = "";
+            const code = await runLive(
                 "kubectl",
                 [...baseArgs(resource, ctx, ns), "exec", "-it", name, "--", shell],
-                { interactive: true },
+                { interactive: true, onStderr: (s) => { capturedStderr = s; } },
             );
+            if (code === 0) return;
+            if (isPermissionError(capturedStderr)) {
+                await showAuthErrorPage(capturedStderr);
+                return;
+            }
+            warn(`Shell exited with code ${code}.`);
+            info("Press any key to continue.");
+            await waitForKeypress();
         },
     },
 

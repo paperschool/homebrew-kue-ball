@@ -26,6 +26,11 @@ vi.mock("./output.js", () => ({
     RESET: "",
     ok: vi.fn(),
     warn: vi.fn(),
+    info: vi.fn(),
+}));
+
+vi.mock("../ui/chrome.js", () => ({
+    waitForKeypress: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@inquirer/prompts", () => ({

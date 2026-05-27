@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.0.1 — 2026-05-27
+
+- Forbidden / Unauthorized errors from interactive `kubectl exec` now route to the auth-error warning page instead of being wiped by the menu re-render. Added `spawnInteractiveCapturingStderr` in shell.js (tees stderr to terminal AND captures it) and an `onStderr` option on runLive; exec post-processes the captured text against `isPermissionError` and dispatches to `showAuthErrorPage` when matched.
+- Renamed `Change namespace` → `Switch namespace` in the Context / Namespace sub-menu so it aligns with `Switch current context`.
+- Renamed top-level `Contexts` → `Context / Namespace` so fuzzy-searching for "namespace" surfaces the entry (its submenu owns the namespace switch).
+- New `waitForKeypress()` helper in chrome.js for any-key dismissal, used as the fallback when `exec` exits non-zero without a permission error.
+
 ## v2.0.0 — 2026-05-27
 
 **Resource × Verb menu redesign.** The flat command list is gone; the wizard now navigates by resource type first, then verb. A single resource registry drives the menu, so adding a new kubernetes resource is a one-line entry rather than a bespoke command module.

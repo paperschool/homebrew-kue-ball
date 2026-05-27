@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.13.2 — 2026-05-27
+
+- Rewrote `.github/prompts/version-and-commit.prompt.md` to pick the right Conventional Commits type per change (feat / fix / refactor / style / perf / test / docs / chore) instead of always using `chore(release):`.
+- Commits now carry a body of 2-3 bullets mirroring the changelog entry verbatim, so `git log --format=full` and `git show <sha>` are self-explanatory without opening the changelog.
+- Added explicit do/don't examples and guidance to NOT default to `chore` (reserve it for genuine tooling-only changes).
+
 ## v1.13.1 — 2026-05-27
 
 - Auth-error page swaps the `⚠ ⚠ ⚠` box for a small 4-row ASCII warning triangle (`/\`, `/  \`, `/ !! \`, `‾‾‾‾‾‾`), centred in yellow above the header. Same dismiss flow.

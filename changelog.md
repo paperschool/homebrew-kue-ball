@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.13.0 — 2026-05-27
+
+- **Authentication / permission error page.** When a captured `kubectl` command exits non-zero and its output matches `isPermissionError` (Forbidden, Unauthorized, 401/403, access denied, etc.), the runner now shows a centred yellow warning page instead of paging the raw stderr. The page displays an ASCII warning box, the salient error line, and a checklist prompt: "Are you logged into Azure, with PIM activated, on the correct network?" Press any key to dismiss.
+
 ## v1.12.4 — 2026-05-27
 
 - Splash animation now actually visible at launch: inserted a 300ms idle window between `drawSplash()` and `checkPrerequisites()` so the gradient gets 3-4 smooth frames of motion before the synchronous `execSync` probes start blocking the event loop. Without this, the user only saw a single ~200ms hold per probe and perceived the splash as frozen at startup.

@@ -1,6 +1,6 @@
 {
   "name": "kue-ball",
-  "version": "1.12.4",
+  "version": "1.13.0",
   "description": "Interactive kubectl wizard CLI — context/namespace/pod/log management for AKS clusters",
   "license": "MIT",
   "repository": {

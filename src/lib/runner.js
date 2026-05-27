@@ -1,6 +1,7 @@
 import { run, captureCommand, spawnInteractive, spawnInteractiveWithExitKeys } from "./shell.js";
 import { info, DIM, RESET, BOLD } from "./output.js";
-import { startProgress, stopProgress, setLastCommandRun } from "../ui/chrome.js";
+import { isPermissionError } from "./azure.js";
+import { startProgress, stopProgress, setLastCommandRun, showAuthErrorPage } from "../ui/chrome.js";
 import { pageOutput } from "../ui/pager.js";
 
 export const RETURN_TO_MENU = "return-to-menu";
@@ -20,7 +21,9 @@ async function _spawnWithProgress(spawn) {
 }
 
 // Runs a one-shot command, animating progress while it runs, then shows its output
-// in the scrollable content-area pager. Returns the exit code.
+// in the scrollable content-area pager. If the command failed with auth/permission
+// text in stderr, route to the chrome auth-error page instead of the raw pager.
+// Returns the exit code.
 async function _runCaptured(cmd, args, onEdit) {
     startProgress();
     let result;
@@ -29,7 +32,11 @@ async function _runCaptured(cmd, args, onEdit) {
     } finally {
         stopProgress();
     }
-    await pageOutput(result.output, { onEdit });
+    if (result.code !== 0 && isPermissionError(result.output)) {
+        await showAuthErrorPage(result.output);
+    } else {
+        await pageOutput(result.output, { onEdit });
+    }
     return result.code;
 }
 

@@ -1,5 +1,5 @@
 import { run } from "../lib/shell.js";
-import { BOLD, CYAN, DIM, RESET } from "../lib/output.js";
+import { BOLD, CYAN, DIM, RESET, YELLOW, stripAnsi } from "../lib/output.js";
 
 const TITLE = "kue-ball";
 
@@ -584,6 +584,97 @@ export function clearContent() {
         w("\x1b[2K");
     }
     moveTo(top, 1);
+}
+
+// ── Auth / permission error page ────────────────────────────────────────────
+// Renders a centred yellow warning box, the salient error line, and a checklist
+// prompt. Awaits any keypress to dismiss. Used by the runner when a captured
+// command exits non-zero with text matching isPermissionError().
+
+function _pullAuthErrorSnippet(output) {
+    const lines = stripAnsi(output ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+    return lines.find((l) => /forbidden|unauthorized|not authorized|permission denied|access denied|\b401\b|\b403\b/i.test(l))
+        ?? lines[0]
+        ?? "Permission denied (no output).";
+}
+
+function _wrap(text, maxWidth) {
+    const words = text.split(/\s+/);
+    const out = [];
+    let current = "";
+    for (const word of words) {
+        if (!current) { current = word; continue; }
+        if (current.length + 1 + word.length <= maxWidth) current += " " + word;
+        else { out.push(current); current = word; }
+    }
+    if (current) out.push(current);
+    return out;
+}
+
+function _centreLine(rowIdx, text, color = "") {
+    const visible = stripAnsi(text);
+    const pad = Math.max(0, Math.floor((cols() - visible.length) / 2));
+    moveTo(rowIdx, 1);
+    w("\x1b[2K" + " ".repeat(pad) + color + text + (color ? RESET : ""));
+}
+
+export async function showAuthErrorPage(errorOutput) {
+    if (!active) return;
+    // Pause any splash animation so the warning page isn't redrawn over.
+    const wasSplashVisible = _splashVisible;
+    _splashVisible = false;
+
+    clearContent();
+
+    const top = _contentStart();
+    const bottom = rows() - 1;
+    const contentHeight = bottom - top + 1;
+    const snippet = _pullAuthErrorSnippet(errorOutput);
+    const wrapWidth = Math.max(40, Math.min(cols() - 8, 72));
+    const wrappedSnippet = _wrap(snippet, wrapWidth);
+    const question = "Are you logged into Azure, with PIM activated, on the correct network?";
+    const wrappedQuestion = _wrap(question, wrapWidth);
+
+    const box = [
+        "╔═══════════╗",
+        "║  ⚠ ⚠ ⚠   ║",
+        "╚═══════════╝",
+    ];
+    const header = "Authentication / Permission Error";
+    const dismiss = "Press any key to return.";
+
+    const blockHeight = box.length + 1 /*gap*/ + 1 /*header*/ + 1 /*gap*/ + wrappedSnippet.length + 1 /*gap*/ + wrappedQuestion.length + 1 /*gap*/ + 1 /*dismiss*/;
+    const startRow = top + Math.max(1, Math.floor((contentHeight - blockHeight) / 2));
+
+    let r = startRow;
+    for (const line of box) _centreLine(r++, line, `${BOLD}${YELLOW}`);
+    r++;
+    _centreLine(r++, header, `${BOLD}${YELLOW}`);
+    r++;
+    for (const line of wrappedSnippet) _centreLine(r++, line, DIM);
+    r++;
+    for (const line of wrappedQuestion) _centreLine(r++, line, YELLOW);
+    r++;
+    _centreLine(r++, dismiss, DIM);
+
+    // Wait for any keypress, then clean up.
+    return new Promise((resolve) => {
+        const wasRaw = process.stdin.isRaw === true;
+        const onData = () => cleanup();
+        const cleanup = () => {
+            process.stdin.off("data", onData);
+            if (!wasRaw && process.stdin.setRawMode) process.stdin.setRawMode(false);
+            process.stdin.pause();
+            clearContent();
+            // Restore splash animation only if it was running before — verb output normally
+            // means we're past the splash phase, so this is just defensive.
+            if (wasSplashVisible) { _splashVisible = true; _drawSplashArt(); }
+            resolve();
+        };
+        if (!wasRaw && process.stdin.setRawMode) process.stdin.setRawMode(true);
+        process.stdin.resume();
+        process.stdin.on("data", onData);
+    });
 }
 
 // Renders a wizard "page": clears the content area and prints a bold title + dim

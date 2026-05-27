@@ -18,6 +18,11 @@ vi.mock("../ui/chrome.js", () => ({
     startProgress: vi.fn(),
     stopProgress: vi.fn(),
     setLastCommandRun: vi.fn(),
+    showAuthErrorPage: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("./azure.js", () => ({
+    isPermissionError: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock("../ui/pager.js", () => ({
@@ -26,6 +31,8 @@ vi.mock("../ui/pager.js", () => ({
 
 import * as shell from "./shell.js";
 import * as chrome from "../ui/chrome.js";
+import { isPermissionError } from "./azure.js";
+import { showAuthErrorPage } from "../ui/chrome.js";
 import { pageOutput } from "../ui/pager.js";
 import {
     isJqAvailable,
@@ -73,6 +80,42 @@ describe("runLive()", () => {
         expect(shell.captureCommand).toHaveBeenCalledWith("kubectl", ["get", "pods"]);
         expect(pageOutput).toHaveBeenCalledWith("pod-a\npod-b", expect.objectContaining({}));
         expect(code).toBe(0);
+    });
+
+    it("routes to the auth-error page (not the pager) when exit is non-zero and output looks like a permission error", async () => {
+        shell.captureCommand.mockResolvedValue({
+            code: 1,
+            output: 'Error from server (Forbidden): deployments.apps "foo" is forbidden',
+        });
+        isPermissionError.mockReturnValueOnce(true);
+
+        const code = await runLive("kubectl", ["get", "deployments"]);
+
+        expect(showAuthErrorPage).toHaveBeenCalledWith(expect.stringContaining("Forbidden"));
+        expect(pageOutput).not.toHaveBeenCalled();
+        expect(code).toBe(1);
+    });
+
+    it("uses the pager (not the auth page) when exit is non-zero but it is NOT a permission error", async () => {
+        shell.captureCommand.mockResolvedValue({ code: 1, output: "some other failure" });
+        isPermissionError.mockReturnValueOnce(false);
+
+        const code = await runLive("kubectl", ["get", "pods"]);
+
+        expect(pageOutput).toHaveBeenCalledWith("some other failure", expect.objectContaining({}));
+        expect(showAuthErrorPage).not.toHaveBeenCalled();
+        expect(code).toBe(1);
+    });
+
+    it("uses the pager when exit is zero even if output happens to contain permission keywords", async () => {
+        shell.captureCommand.mockResolvedValue({ code: 0, output: "Forbidden in field" });
+        // Even if isPermissionError would say true, exit=0 should never trigger the warning page.
+        isPermissionError.mockReturnValueOnce(true);
+
+        await runLive("kubectl", ["get", "pods"]);
+
+        expect(showAuthErrorPage).not.toHaveBeenCalled();
+        expect(pageOutput).toHaveBeenCalled();
     });
 
     it("records the actual command in the chrome header", async () => {

@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.13.1 — 2026-05-27
+
+- Auth-error page swaps the `⚠ ⚠ ⚠` box for a small 4-row ASCII warning triangle (`/\`, `/  \`, `/ !! \`, `‾‾‾‾‾‾`), centred in yellow above the header. Same dismiss flow.
+
 ## v1.13.0 — 2026-05-27
 
 - **Authentication / permission error page.** When a captured `kubectl` command exits non-zero and its output matches `isPermissionError` (Forbidden, Unauthorized, 401/403, access denied, etc.), the runner now shows a centred yellow warning page instead of paging the raw stderr. The page displays an ASCII warning box, the salient error line, and a checklist prompt: "Are you logged into Azure, with PIM activated, on the correct network?" Press any key to dismiss.

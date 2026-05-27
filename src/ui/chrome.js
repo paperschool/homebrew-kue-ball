@@ -635,19 +635,22 @@ export async function showAuthErrorPage(errorOutput) {
     const question = "Are you logged into Azure, with PIM activated, on the correct network?";
     const wrappedQuestion = _wrap(question, wrapWidth);
 
-    const box = [
-        "╔═══════════╗",
-        "║  ⚠ ⚠ ⚠   ║",
-        "╚═══════════╝",
+    // Small ASCII warning triangle — each row is its own independent centre line,
+    // so the slashes form a proper triangle widening from the apex.
+    const warningArt = [
+        "/\\",
+        "/  \\",
+        "/ !! \\",
+        "‾‾‾‾‾‾",
     ];
     const header = "Authentication / Permission Error";
     const dismiss = "Press any key to return.";
 
-    const blockHeight = box.length + 1 /*gap*/ + 1 /*header*/ + 1 /*gap*/ + wrappedSnippet.length + 1 /*gap*/ + wrappedQuestion.length + 1 /*gap*/ + 1 /*dismiss*/;
+    const blockHeight = warningArt.length + 1 /*gap*/ + 1 /*header*/ + 1 /*gap*/ + wrappedSnippet.length + 1 /*gap*/ + wrappedQuestion.length + 1 /*gap*/ + 1 /*dismiss*/;
     const startRow = top + Math.max(1, Math.floor((contentHeight - blockHeight) / 2));
 
     let r = startRow;
-    for (const line of box) _centreLine(r++, line, `${BOLD}${YELLOW}`);
+    for (const line of warningArt) _centreLine(r++, line, `${BOLD}${YELLOW}`);
     r++;
     _centreLine(r++, header, `${BOLD}${YELLOW}`);
     r++;

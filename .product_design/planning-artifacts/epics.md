@@ -33,6 +33,9 @@ Decomposition of the modularisation PRD into epics and stories. The goal is to t
 - **FR14** Universal verbs (list, describe, edit, delete) have a single generic implementation that works for any registered resource type
 - **FR15** New resource types can be added by registering them in `src/lib/resources.js` without touching menu navigation or universal verb-handler code
 - **FR16** Helm and Ping remain top-level entries alongside the resource picker — they are not bound to a kubernetes resource type
+- **FR17** `kue-ball` installs and runs end-to-end inside Ubuntu running on WSL2, with no source modifications required at install time
+- **FR18** The README documents a Windows install path that walks the user through enabling WSL2, installing Ubuntu, installing prerequisites (Node ≥22, kubectl, helm, az), and running `kue-ball`
+- **FR19** `src/lib/shell.js` uses `path.delimiter` and platform-aware extra PATH entries, so the Mac-specific Homebrew/Rancher Desktop paths do not pollute environments where they don't exist (Linux/WSL without Homebrew)
 
 ### Non-Functional Requirements
 
@@ -43,27 +46,31 @@ Decomposition of the modularisation PRD into epics and stories. The goal is to t
 - **NFR5** The chrome layer is additive — existing `@inquirer/prompts`-based prompts require no changes in Stories 5.1–5.3
 - **NFR6** The background poller is non-blocking; it never delays or interrupts foreground command execution
 - **NFR7** On any exit path (normal, Ctrl+C, uncaught error), the terminal is fully restored to its pre-launch state
+- **NFR8** Native Windows (PowerShell, `cmd.exe`) is explicitly out of scope; the supported Windows path is WSL2 → Ubuntu → run as a Linux binary. No platform-detection branches for win32 are added to runtime code paths beyond defensive PATH handling (FR19)
 
 ### FR Coverage Map
 
-| FR   | Epic 1 | Epic 2 | Epic 3 | Epic 4 | Epic 5 | Epic 6 |
-| ---- | ------ | ------ | ------ | ------ | ------ | ------ |
-| FR1  | ✓      | ✓      | ✓      | ✓      |        |        |
-| FR2  |        | ✓      |        |        |        |        |
-| FR3  |        | ✓      |        |        |        |        |
-| FR4  |        | ✓      |        |        |        |        |
-| FR5  | ✓      | ✓      | ✓      | ✓      |        | ✓      |
-| FR6  | ✓      | ✓      | ✓      |        |        | ✓      |
-| FR7  |        |        |        | ✓      |        |        |
-| FR8  |        |        |        |        | ✓      |        |
-| FR9  |        |        |        |        | ✓      |        |
-| FR10 |        |        |        |        | ✓      |        |
-| FR11 |        |        |        |        | ✓      |        |
-| FR12 |        |        |        |        |        | ✓      |
-| FR13 |        |        |        |        |        | ✓      |
-| FR14 |        |        |        |        |        | ✓      |
-| FR15 |        |        |        |        |        | ✓      |
-| FR16 |        |        |        |        |        | ✓      |
+| FR   | Epic 1 | Epic 2 | Epic 3 | Epic 4 | Epic 5 | Epic 6 | Epic 7 |
+| ---- | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
+| FR1  | ✓      | ✓      | ✓      | ✓      |        |        |        |
+| FR2  |        | ✓      |        |        |        |        |        |
+| FR3  |        | ✓      |        |        |        |        |        |
+| FR4  |        | ✓      |        |        |        |        |        |
+| FR5  | ✓      | ✓      | ✓      | ✓      |        | ✓      |        |
+| FR6  | ✓      | ✓      | ✓      |        |        | ✓      |        |
+| FR7  |        |        |        | ✓      |        |        |        |
+| FR8  |        |        |        |        | ✓      |        |        |
+| FR9  |        |        |        |        | ✓      |        |        |
+| FR10 |        |        |        |        | ✓      |        |        |
+| FR11 |        |        |        |        | ✓      |        |        |
+| FR12 |        |        |        |        |        | ✓      |        |
+| FR13 |        |        |        |        |        | ✓      |        |
+| FR14 |        |        |        |        |        | ✓      |        |
+| FR15 |        |        |        |        |        | ✓      |        |
+| FR16 |        |        |        |        |        | ✓      |        |
+| FR17 |        |        |        |        |        |        | ✓      |
+| FR18 |        |        |        |        |        |        | ✓      |
+| FR19 |        |        |        |        |        |        | ✓      |
 
 ---
 
@@ -77,6 +84,7 @@ Decomposition of the modularisation PRD into epics and stories. The goal is to t
 | 4   | Wire-up & Integration                 | `src/main.js` assembled, entry-point thinned, CLI verified end-to-end                                       |
 | 5   | TUI Chrome & Persistent Status Bar    | Persistent title bar, status bar frame, Azure identity panel, auth health poller, and anchored search input |
 | 6   | Resource × Verb Menu Redesign         | Two-level menu (resource → verb) backed by a single resource registry and reusable universal-verb handlers  |
+| 7   | Windows Support via WSL2              | Officially supported install path for Windows users running Ubuntu on WSL2 — smoke-tested, documented, with defensive PATH handling so the Mac-isms don't bite on a clean WSL install |
 
 ---
 
@@ -1072,5 +1080,138 @@ So that storage and cluster-level inspection is part of the same flow as workloa
 **And** each is grouped under `Cluster` (Nodes) or `Storage` (HPA/PVC/PV)
 **And** the `pickResourceInstance` helper handles cluster-scoped pickers correctly (no `--namespace` flag in the underlying `kubectl get` call)
 **And** `resources.test.js` is extended to assert the new entries' `namespaced` flag and verb sets
+
+---
+
+## Epic 7: Windows Support via WSL2
+
+**Goal:** Officially support Windows users running `kue-ball` under WSL2 (Ubuntu). The CLI itself runs as a Linux binary; WSL handles the kernel and filesystem translation. No native Windows console (PowerShell / `cmd.exe`) work is in scope — that path is explicitly deferred per NFR8.
+
+The work is intentionally small: one round of empirical smoke testing on real WSL, a documentation update so Windows users have a clear install path, and a defensive refactor of `src/lib/shell.js` so the Mac-specific Homebrew/Rancher Desktop PATH additions don't cause confusion or noise on a clean WSL Ubuntu (and don't actively misbehave when, say, `process.env.HOME` is set but no Homebrew is installed).
+
+**FRs covered:** FR17, FR18, FR19
+
+**NFRs covered:** NFR1 (no regression on Mac/Linux), NFR4 (each story independently mergeable), NFR8 (no native Windows)
+
+**Dependency:** Epic 6 complete (the registry/verb architecture is the user-facing surface being verified).
+
+**Out of scope:**
+
+- Native Windows console support (PowerShell 7, Windows Terminal without WSL, `cmd.exe`). The shell pipeline assumptions in `runShell` / `logsToFile`, the chrome's ANSI escape codes, the alternate-screen-buffer dance, and the `setRawMode` keypress handling are all assumed to be tested only inside WSL's Ubuntu environment.
+- Windows-specific config directory (`%APPDATA%`). On WSL the existing `~/.config/kue-ball/prefs.json` works because WSL exposes a real Linux filesystem.
+- Homebrew tap installation. Linuxbrew on WSL is a separate ecosystem; we recommend `npm install -g .` or `git clone + npm start` for WSL users.
+
+---
+
+### Story 7.1: WSL2 end-to-end smoke test
+
+As a maintainer,
+I want a documented round of empirical testing on a real WSL2 + Ubuntu environment,
+So that I know which (if any) flows behave differently from the Mac baseline before promising Windows users that the tool works for them.
+
+**Acceptance Criteria:**
+
+**Given** a Windows 11 (or 10 build 19041+) host with WSL2 enabled
+**When** the developer installs Ubuntu 22.04 (or later) under WSL2 and runs:
+  ```
+  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+  sudo apt-get install -y nodejs
+  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+  sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+  curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+  ```
+**Then** all three CLIs (`kubectl`, `helm`, `az`) report a version and the binaries are on `PATH`
+
+**Given** the same WSL2 environment with prerequisites installed
+**When** the developer clones the repo and runs `npm install && node src/main.js`
+**Then** the splash renders correctly in Windows Terminal (the default WSL host) with all box-drawing characters (`╔ ║ ═`), shading blocks (`░ ▒ ▓ █`), and the rotating gradient visible
+
+**Given** the wizard is at the resource picker
+**When** the developer walks the following matrix end-to-end against a real AKS cluster reachable from the WSL environment:
+  - **Picker navigation**: fuzzy-search resources, hit `⌫`/`←` to step back from sub-menus, "Exit" cleanly restores the terminal
+  - **Universal verbs**: `list` on Pods/Deployments/Services, `describe` on a Pod with `e` to launch `kubectl edit`, `delete` on a test resource with confirm prompt
+  - **Specific verbs**: `logs` on a Pod (stream + `q` to exit), `exec` into a Pod (both success and Forbidden paths to verify the auth-error page renders), `scale` on a Deployment
+  - **Top-level extras**: Helm list, Ping (against an Ingress route), Events recent, Context / Namespace switch
+  - **Auth flow**: at least one verified Forbidden error from a namespace the user lacks RBAC on, confirming the auth-error warning page renders correctly
+**Then** every flow behaves identically to the Mac baseline, OR each deviation is documented as a known caveat in story Completion Notes
+
+**Given** the smoke test runs cleanly
+**When** the developer also exercises:
+  - Resize: resize the Windows Terminal window mid-session; chrome re-centres splash/menus
+  - Ctrl+C: exits cleanly with alternate screen restored, prompt returns
+  - Foreground vs background WSL tabs: behaviour identical
+**Then** no terminal corruption, lingering escape codes, or scroll-region artefacts are observed when returning to the parent shell
+
+**And** any deviations are captured in `docs/wsl2-known-caveats.md` (created if needed) with terminal version, Ubuntu version, and steps to reproduce. If no deviations: the file is created with a single line stating "no known caveats as of {DATE}".
+
+---
+
+### Story 7.2: README — Windows install path via WSL2
+
+As a Windows user,
+I want a clear step-by-step install guide in the README,
+So that I can get `kue-ball` running without guessing whether it's supposed to work on Windows in the first place.
+
+**Acceptance Criteria:**
+
+**Given** the README is updated
+**When** the user reaches the "Install" section
+**Then** a new subsection titled "Windows (via WSL2)" appears alongside the existing Homebrew / npm / dev install methods, with:
+  - A one-sentence statement that native Windows (PowerShell, cmd) is not supported and WSL2 is the supported path
+  - Numbered install steps: enable WSL2 (`wsl --install`), install Ubuntu from the Microsoft Store or `wsl --install -d Ubuntu`, open the Ubuntu shell, install Node ≥22, install `kubectl`, install `helm` (optional), install `az` (optional, for context refresh), clone the repo and `npm install`, run `npm start` or `node src/main.js`
+  - A note that Windows Terminal (the default WSL host on Win 11) renders the TUI correctly; legacy `conhost.exe` is not supported
+  - A link to `docs/wsl2-known-caveats.md` (from Story 7.1)
+
+**Given** the README's "Requirements" section
+**When** the user reads it
+**Then** Windows is listed alongside macOS as a supported platform, with the clarification "via WSL2 — see Install → Windows"
+
+**Given** the README's "Upgrading" section
+**When** a Windows-on-WSL user reads it
+**Then** the section notes that the Homebrew upgrade path does not apply on WSL — instead, `git pull && npm install` in the cloned repo, or re-run the `npm install -g .` install command
+
+**And** none of these additions break the existing Homebrew / npm / dev install paths or change their wording beyond what's necessary to add the Windows option.
+
+---
+
+### Story 7.3: Defensive cross-platform PATH handling in `src/lib/shell.js`
+
+As a developer,
+I want `buildEnv()` in `src/lib/shell.js` to use platform-aware path delimiters and only add extra PATH entries that actually exist,
+So that a clean WSL Ubuntu install (where Homebrew and Rancher Desktop don't exist) doesn't accumulate dead path entries — and so a future native-Windows attempt has one fewer hard-coded POSIX-ism to remove.
+
+**Acceptance Criteria:**
+
+**Given** `src/lib/shell.js` is modified
+**When** `buildEnv()` runs on macOS (the existing baseline)
+**Then** the resulting `PATH` contains `~/.rd/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` prepended (separated by `:`), exactly as today — zero behavioural change on Mac
+
+**Given** `src/lib/shell.js` is modified
+**When** `buildEnv()` runs on Linux (including WSL2 Ubuntu)
+**Then** the resulting `PATH` contains only `/usr/local/bin` (the one POSIX entry that's actually relevant on Linux), prepended with `:`. The Mac-specific `~/.rd/bin` and `/opt/homebrew/bin` entries are NOT added (their absence has no negative effect, and their presence as dead paths is a minor lint-level smell)
+
+**Given** the implementation
+**When** the developer inspects `shell.js`
+**Then** the path delimiter is read from `node:path`'s `path.delimiter` (NOT a hard-coded `:`), so a hypothetical future Windows port would only need to extend the platform branch, not re-find the separator
+
+**Given** the implementation
+**When** `buildEnv()` runs on win32 (a future maintainer's hypothetical run)
+**Then** the function returns `process.env` unchanged with no extra paths prepended — i.e. it doesn't actively break, but doesn't add Mac-specific paths either
+
+**Given** `src/lib/shell.test.js` is updated
+**When** the test suite runs
+**Then** the existing macOS expectations still pass (test runs on macOS in CI), and new test cases assert:
+  - When `os.platform()` is mocked to `"linux"`, only `/usr/local/bin` is prepended
+  - When `os.platform()` is mocked to `"win32"`, no extra paths are prepended (PATH equals process.env.PATH)
+  - When `os.platform()` is mocked to `"darwin"`, the existing three entries are prepended in the documented order
+
+**And** no other file in `src/lib/` needs modification — this story is intentionally contained to `shell.js` + its test.
+
+**Technical Notes**
+
+- The change is small (~10 lines). The point is the test surface and the documented intent, not the runtime delta.
+- `node:os.platform()` returns `"darwin" | "linux" | "win32"` reliably. Don't over-engineer with a feature-detection approach — a switch on platform is correct here.
+- Don't add the Windows path branch as part of this story. Story 7.3's goal is to make `buildEnv()` *safe* on win32 (returns env unchanged), not to enable win32 — that's NFR8 territory and would be a follow-up epic.
 
 ---

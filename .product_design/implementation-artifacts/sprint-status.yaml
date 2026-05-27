@@ -103,3 +103,10 @@ development_status:
   6-7-add-new-resources-statefulsets-daemonsets-jobs-cronjobs: review
   6-8-add-cluster-scoped-storage-resources-nodes-hpa-pvc-pv: review
   epic-6-retrospective: optional
+
+  # Epic 7 — Windows Support via WSL2
+  epic-7: backlog
+  7-1-wsl2-end-to-end-smoke-test: ready-for-dev
+  7-2-readme-windows-install-path-via-wsl2: ready-for-dev
+  7-3-defensive-cross-platform-path-handling-in-shell-js: ready-for-dev
+  epic-7-retrospective: optional

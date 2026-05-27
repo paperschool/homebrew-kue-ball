@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.0.2 — 2026-05-27
+
+- New Epic 7 in `planning-artifacts/epics.md`: **Windows Support via WSL2**. Adds FR17 / FR18 / FR19 (WSL install, README docs, defensive PATH handling), NFR8 (native Windows console explicitly out of scope), and three stories.
+- Three ready-for-dev story files under `implementation-artifacts/`: 7-1 (WSL2 end-to-end smoke test), 7-2 (README — Windows install path via WSL2), 7-3 (defensive cross-platform PATH handling in `shell.js`).
+- `sprint-status.yaml` registers Epic 7 (backlog) and its three stories (ready-for-dev).
+
 ## v2.0.1 — 2026-05-27
 
 - Forbidden / Unauthorized errors from interactive `kubectl exec` now route to the auth-error warning page instead of being wiped by the menu re-render. Added `spawnInteractiveCapturingStderr` in shell.js (tees stderr to terminal AND captures it) and an `onStderr` option on runLive; exec post-processes the captured text against `isPermissionError` and dispatches to `showAuthErrorPage` when matched.

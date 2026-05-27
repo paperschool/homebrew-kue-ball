@@ -231,6 +231,10 @@ async function main() {
     startAuthPoller((status) => setAuthStatus(status));
     process.on("exit", stopAuthPoller);
     drawSplash();
+    // Give the animation a clean 300ms window of smooth motion before prereq's synchronous
+    // execSync calls start blocking the event loop. Without this, the splash visibly freezes
+    // in 200ms chunks between probes, reading as "no animation" at launch.
+    await new Promise((resolve) => setTimeout(resolve, 300));
     const { azAvailable } = await checkPrerequisites();
     // Hold the splash for a beat so the user actually sees it after the prereq lines settle.
     await new Promise((resolve) => setTimeout(resolve, 2000));

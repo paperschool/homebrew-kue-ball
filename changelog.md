@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.12.4 — 2026-05-27
+
+- Splash animation now actually visible at launch: inserted a 300ms idle window between `drawSplash()` and `checkPrerequisites()` so the gradient gets 3-4 smooth frames of motion before the synchronous `execSync` probes start blocking the event loop. Without this, the user only saw a single ~200ms hold per probe and perceived the splash as frozen at startup.
+
 ## v1.12.3 — 2026-05-26
 
 - Prereq check output (`✓ kubectl/helm/az found`) is now locked to the bottom of the screen — anchored to `rows() - 4` rather than parked right under the splash. The buffer is exactly large enough that the third trailing `\n` lands on `rows() - 1` (the row directly above the status bar) without crossing the scroll-region bottom, so the splash doesn't get bumped up.

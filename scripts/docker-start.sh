@@ -20,7 +20,7 @@ cd "$REPO_ROOT"
 # `docker image rm kue-ball-wsl-test` to force a rebuild).
 if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     echo "→ Building $IMAGE_NAME (first run only — ~3 min, cached after this)..."
-    docker build --platform=linux/amd64 -t "$IMAGE_NAME" -f "$DOCKERFILE" .
+    docker build -t "$IMAGE_NAME" -f "$DOCKERFILE" .
     echo ""
 fi
 
@@ -30,7 +30,7 @@ declare -a mounts=()
 [ -d "$HOME/.kube" ]  && mounts+=("-v" "$HOME/.kube:/root/.kube")
 [ -d "$HOME/.azure" ] && mounts+=("-v" "$HOME/.azure:/root/.azure")
 
-echo "→ Starting kue-ball in $IMAGE_NAME (Ubuntu 22.04 amd64)"
+echo "→ Starting kue-ball in $IMAGE_NAME (Ubuntu 22.04, native architecture)"
 echo "  This approximates the WSL2 environment. Ctrl+C / 'Exit' returns you to the host."
 echo ""
 
@@ -38,7 +38,6 @@ echo ""
 # build artifacts (or vice versa — the host's node_modules would not work in
 # the Linux container if any native deps exist).
 exec docker run -it --rm \
-    --platform=linux/amd64 \
     --name kue-ball-wsl-test \
     -v "$REPO_ROOT:/app" \
     -v "$NODE_MODULES_VOLUME:/app/node_modules" \

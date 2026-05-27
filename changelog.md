@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.0.5 — 2026-05-27
+
+- Fixed `npm run docker:start` failing mid-build on Apple Silicon with a misleading `/bin/sh: no such file or directory` during the helm install step. Root cause: forcing `linux/amd64` ran the image under Rosetta/QEMU emulation, which flakes on multi-process bash pipes. Dropped the `--platform=linux/amd64` from both `Dockerfile.wsl-test` and the docker run/build commands — now uses the host's native architecture (arm64 on Apple Silicon, amd64 on Intel). The Linux behaviour kue-ball cares about is identical between the two.
+- Dockerfile is now arch-aware: kubectl and kubelogin downloads use `dpkg --print-architecture` to pick the right binary. az CLI installs via Microsoft's apt repo (which supports both amd64 and arm64 on jammy) instead of the curl-pipe-bash installer.
+
 ## v2.0.4 — 2026-05-27
 
 - New `npm run docker:start` builds and runs kue-ball inside an Ubuntu 22.04 amd64 container with Node 22 + kubectl + kubelogin + helm + az + jq pre-installed. Mounts the repo, `~/.kube`, and `~/.azure` so you can hit real clusters from inside the container. Lets a Mac dev approximate the WSL2 Ubuntu environment for Epic 7 smoke testing without a Windows box (~70% coverage; misses Windows Terminal-specific quirks).

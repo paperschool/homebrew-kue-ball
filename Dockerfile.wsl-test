@@ -1,15 +1,21 @@
-# Ubuntu 22.04 amd64 image that approximates a WSL2 Ubuntu environment, used by
+# Ubuntu 22.04 image that approximates a WSL2 Ubuntu environment, used by
 # `npm run docker:start` to test kue-ball's "Windows via WSL2" install path on a
 # Mac without needing an actual Windows machine.
 #
-# Forces linux/amd64 so it matches real WSL (which is always amd64 on Windows);
-# on Apple Silicon this runs under Rosetta-style emulation — slower but faithful.
+# Uses the host's NATIVE architecture (amd64 on Intel, arm64 on Apple Silicon).
+# Earlier versions forced linux/amd64 to mimic real WSL exactly, but that ran
+# under Rosetta/QEMU emulation and would intermittently fail mid-build (helm's
+# `curl | bash` would die with a misleading "/bin/sh: no such file or directory").
+# Native arch is fast and reliable; the Linux behaviour kue-ball cares about
+# (os.platform() === "linux", shell pipelines, install steps) is identical
+# between amd64 and arm64 Linux.
 #
-# Coverage: catches POSIX-isms, install-step typos, the Linux platform branch in
-# shell.js, and most of the TUI rendering. Does NOT cover Windows Terminal-specific
-# quirks or WSL ↔ Windows filesystem boundary issues — those still need real Windows.
+# Coverage: catches POSIX-isms, install-step typos, the Linux platform branch
+# in shell.js, and most of the TUI rendering. Does NOT cover Windows Terminal-
+# specific quirks or WSL ↔ Windows filesystem boundary issues — those still
+# need a real Windows host.
 
-FROM --platform=linux/amd64 ubuntu:22.04
+FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -23,28 +29,43 @@ RUN apt-get update && apt-get install -y \
         unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Node ≥ 22 via NodeSource
+# Node ≥ 22 via NodeSource (multi-arch).
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# kubectl (latest stable)
-RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+# kubectl (latest stable). dpkg --print-architecture returns amd64 / arm64
+# to match Kubernetes's release download paths.
+RUN ARCH=$(dpkg --print-architecture) \
+    && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl" \
     && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl \
     && rm kubectl
 
-# kubelogin — needed for AAD-integrated AKS clusters; without it, kubectl returns
-# "exec plugin: invalid apiVersion" when calling against an AAD-protected cluster.
-RUN curl -LO "https://github.com/Azure/kubelogin/releases/latest/download/kubelogin-linux-amd64.zip" \
-    && unzip -q kubelogin-linux-amd64.zip \
-    && install -o root -g root -m 0755 bin/linux_amd64/kubelogin /usr/local/bin/kubelogin \
-    && rm -rf kubelogin-linux-amd64.zip bin/
+# kubelogin (needed for AAD-integrated AKS clusters; without it kubectl errors
+# with "exec plugin: invalid apiVersion" against AAD-protected clusters).
+# kubelogin releases ship linux-amd64 and linux-arm64 archives.
+RUN ARCH=$(dpkg --print-architecture) \
+    && curl -LO "https://github.com/Azure/kubelogin/releases/latest/download/kubelogin-linux-${ARCH}.zip" \
+    && unzip -q "kubelogin-linux-${ARCH}.zip" \
+    && install -o root -g root -m 0755 "bin/linux_${ARCH}/kubelogin" /usr/local/bin/kubelogin \
+    && rm -rf "kubelogin-linux-${ARCH}.zip" bin/
 
-# helm
+# helm — official installer auto-detects arch.
 RUN curl -sS https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
-# az CLI (Microsoft official installer)
-RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+# az CLI — Microsoft's apt repo supports both amd64 and arm64 (jammy/22.04 onwards).
+RUN apt-get update \
+    && apt-get install -y apt-transport-https \
+    && curl -sL https://packages.microsoft.com/keys/microsoft.asc \
+        | gpg --dearmor \
+        | tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null \
+    && AZ_REPO=$(lsb_release -cs) \
+    && ARCH=$(dpkg --print-architecture) \
+    && echo "deb [arch=${ARCH}] https://packages.microsoft.com/repos/azure-cli/ ${AZ_REPO} main" \
+        | tee /etc/apt/sources.list.d/azure-cli.list \
+    && apt-get update \
+    && apt-get install -y azure-cli \
+    && rm -rf /var/lib/apt/lists/*
 
 # Quality-of-life: kue-ball uses the rotating splash + box-drawing glyphs which
 # render correctly only if locale supports UTF-8. Ubuntu base image is C.UTF-8

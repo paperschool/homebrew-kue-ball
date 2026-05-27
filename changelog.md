@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.0.9 — 2026-05-27
+
+- Fixed "crashes without error" symptom on exit paths from the menu (e.g. after `Refresh contexts`). The chrome's alternate-screen buffer was being restored on shutdown BEFORE error messages could be written to it, so `console.error`/`console.log` output for failures, prompt-cancellations, and other forced exits was silently wiped — the user saw a clean shell prompt with no indication of what went wrong. `main()`'s top-level catch now calls `destroyChrome()` BEFORE printing, so errors land in the terminal's main buffer and survive. `pickContext()`'s two "still no contexts" exit paths and `checkPrerequisites()`'s "kubectl not found" exit get the same treatment.
+- Errors now also print the first few stack-trace lines (in dim) when available, so an async-throw failure (e.g. inside `refreshContexts`) is diagnosable rather than just a single-line message.
+
 ## v2.0.8 — 2026-05-27
 
 - README gets a "Windows (via WSL2)" install subsection (Story 7-2) with the full 8-step setup, a prominent footgun warning to clone into `~/dev/...` not `/mnt/c/...`, the Windows Terminal note, and a link to `docs/wsl2-known-caveats.md`. Also a new "Run inside Docker (Mac dev shortcut)" subsection pointing at `npm run docker:start`. Intro + Requirements + Upgrading sections all updated to call out Windows-via-WSL2 as supported.

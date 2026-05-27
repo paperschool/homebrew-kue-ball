@@ -11,7 +11,7 @@ import { APP_NAME, DEFAULT_NAMESPACE, DEFAULT_CONTEXT } from "./lib/env.js";
 import { refreshContexts, isPermissionError, showPimReminder, subscriptionForContext, isAzCliAvailable, getAzVersion } from "./lib/azure.js";
 import { RETURN_TO_MENU, runLive } from "./lib/runner.js";
 import { searchableList, BACK_SIGNAL } from "./ui/searchableList.js";
-import { initChrome, loadIdentity, setAuthStatus, drawSplash, hideSplash, setContextInfo, setLastCommand, setSubscription, step } from "./ui/chrome.js";
+import { initChrome, loadIdentity, setAuthStatus, drawSplash, hideSplash, setContextInfo, setLastCommand, setSubscription, step, destroyChrome } from "./ui/chrome.js";
 import { startAuthPoller, stopAuthPoller } from "./ui/authPoller.js";
 import { confirm, input } from "@inquirer/prompts";
 
@@ -96,13 +96,18 @@ async function pickContext() {
         warn("No kubeconfig contexts found.");
         const refreshed = await refreshContexts();
         if (!refreshed) {
+            // destroyChrome BEFORE the log so the message survives the alt-screen
+            // restore on exit. Without this, the console.log lands in the alt-screen
+            // buffer and disappears when chrome's exit-handler restores the main buffer.
+            destroyChrome();
             console.log(`\n  ${DIM}Run the wizard again once you have contexts.${RESET}\n`);
             process.exit(1);
             return null;
         }
         contexts = getContexts();
         if (contexts.length === 0) {
-            warn("Contexts still not found after credential pull — run the wizard again.");
+            destroyChrome();
+            console.log(`\n  ${YELLOW}⚠${RESET} Contexts still not found after credential pull — run the wizard again.\n`);
             process.exit(1);
             return null;
         }
@@ -159,7 +164,9 @@ async function checkPrerequisites() {
 
     const kubectl = await probe("kubectl", isKubectlAvailable, getKubectlVersion);
     if (!kubectl.found) {
-        process.stderr.write(`  ${RED}✗ kubectl not found.${RESET}\n`);
+        // Exit alt-screen first so the install hint actually survives the shutdown.
+        destroyChrome();
+        process.stderr.write(`\n  ${RED}✗ kubectl not found.${RESET}\n`);
         process.stderr.write(`  ${DIM}  Install it via: brew install kubectl${RESET}\n\n`);
         process.exit(1);
     }
@@ -294,7 +301,21 @@ async function main() {
 }
 
 main().catch((err) => {
-    if (err.name === "ExitPromptError") { console.log(`\n  ${DIM}Cancelled.${RESET}\n`); process.exit(0); return; }
-    console.error(`\n  ${RED}✗ ${err.message}${RESET}\n`);
+    // Destroy chrome (exit alt-screen) BEFORE writing any error output so the
+    // message lands in the terminal's main buffer and survives the shutdown.
+    // Without this, console.error writes into the alt-screen which is then
+    // restored away by destroyChrome's exit handler — the user sees a clean
+    // shell prompt with no indication of what went wrong.
+    try { destroyChrome(); } catch { /* best-effort cleanup */ }
+    if (err.name === "ExitPromptError") {
+        console.log(`\n  ${DIM}Cancelled.${RESET}\n`);
+        process.exit(0);
+        return;
+    }
+    // Surface stack trace too — the message alone is often unhelpful for
+    // diagnosing async-throw failures (e.g. refreshContexts post-loop issues).
+    console.error(`\n  ${RED}✗ ${err.message ?? err}${RESET}`);
+    if (err.stack) console.error(`  ${DIM}${err.stack.split("\n").slice(1, 6).join("\n  ")}${RESET}`);
+    console.error("");
     process.exit(1);
 });

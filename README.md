@@ -2,11 +2,14 @@
 
 <table>
   <tr>
-    <td>
-      <img src="docs/main.png" alt="Kue-Ball - Home Interface" width="100%" />
+    <td style="padding: 0; margin: 0">
+      <img src="docs/title.png" alt="Kue-Ball - Home Interface" width="100%" />
     </td>
-    <td>
-      <img src="docs/main-2.png" alt="Kue-Ball - List Interface" width="100%" />
+    <td style="padding: 0; margin: 0">
+      <img src="docs/resource-controls.png" alt="Kue-Ball - List Interface" width="100%" />
+    </td>
+    <td style="padding: 0; margin: 0">
+      <img src="docs/pod-controls.png" alt="Kue-Ball - List Interface" width="100%" />
     </td>
   </tr>
 </table>
@@ -45,6 +48,25 @@ npm install
 npm start
 # or
 node src/main.js
+```
+
+## Upgrading
+
+If you installed via the Homebrew tap, upgrade with:
+
+```bash
+brew update
+brew upgrade kue-ball
+```
+
+`brew update` refreshes the tap so brew sees the latest formula bump (auto-pushed by the release workflow on every `v*` tag); `brew upgrade kue-ball` then reinstalls from the new tarball. Confirm with `brew info kue-ball`.
+
+If brew is being stubborn, force a fresh tap:
+
+```bash
+brew untap paperschool/kue-ball
+brew tap paperschool/kue-ball
+brew upgrade kue-ball
 ```
 
 ## Configuration
@@ -97,13 +119,13 @@ The same verb (e.g. `delete`) works against every resource that supports it — 
 
 17 kubernetes resources are registered out of the box, grouped by domain:
 
-| Group | Resources |
-|---|---|
-| **Workloads** | Pods, Deployments, ReplicaSets, StatefulSets, DaemonSets, Jobs, CronJobs |
-| **Config** | ConfigMaps, Secrets |
-| **Networking** | Services, Ingress, ServiceAccounts, VirtualServices |
-| **Cluster** | Nodes |
-| **Storage** | HPA, PVCs, PVs |
+| Group          | Resources                                                                |
+| -------------- | ------------------------------------------------------------------------ |
+| **Workloads**  | Pods, Deployments, ReplicaSets, StatefulSets, DaemonSets, Jobs, CronJobs |
+| **Config**     | ConfigMaps, Secrets                                                      |
+| **Networking** | Services, Ingress, ServiceAccounts, VirtualServices                      |
+| **Cluster**    | Nodes                                                                    |
+| **Storage**    | HPA, PVCs, PVs                                                           |
 
 Cluster-scoped resources (Nodes, PVs) automatically omit `--namespace` from every kubectl call.
 
@@ -111,12 +133,12 @@ Cluster-scoped resources (Nodes, PVs) automatically omit `--namespace` from ever
 
 **Universal verbs** work against any registered resource:
 
-| Verb | What it does |
-|---|---|
-| `list` | `kubectl get {plural} -o wide` |
+| Verb       | What it does                                                                       |
+| ---------- | ---------------------------------------------------------------------------------- |
+| `list`     | `kubectl get {plural} -o wide`                                                     |
 | `describe` | `kubectl describe {kind} {name}` — press `e` in the pager to launch `kubectl edit` |
-| `edit` | `kubectl edit {kind} {name}` (honours `KUBE_EDITOR`, defaults to `nano`) |
-| `delete` | `kubectl delete {kind} {name}` (confirms first) |
+| `edit`     | `kubectl edit {kind} {name}` (honours `KUBE_EDITOR`, defaults to `nano`)           |
+| `delete`   | `kubectl delete {kind} {name}` (confirms first)                                    |
 
 **Specific verbs** cover the resource-flavoured actions:
 

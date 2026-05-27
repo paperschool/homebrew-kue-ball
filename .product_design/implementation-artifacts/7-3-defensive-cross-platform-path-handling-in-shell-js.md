@@ -23,9 +23,9 @@ so that a clean WSL Ubuntu install (where Homebrew and Rancher Desktop don't exi
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Refactor `buildEnv()` to be platform-aware** (AC: #1, #2, #3, #4)
-  - [ ] Add `import { platform } from "node:os";` and `import { delimiter as pathDelimiter } from "node:path";` to `src/lib/shell.js`.
-  - [ ] Replace the existing `buildEnv()` body with a platform branch:
+- [x] **Task 1: Refactor `buildEnv()` to be platform-aware** (AC: #1, #2, #3, #4)
+  - [x] Add `import { platform } from "node:os";` and `import { delimiter as pathDelimiter } from "node:path";` to `src/lib/shell.js`.
+  - [x] Replace the existing `buildEnv()` body with a platform branch:
     ```js
     function buildEnv() {
         const plat = platform();
@@ -45,20 +45,20 @@ so that a clean WSL Ubuntu install (where Homebrew and Rancher Desktop don't exi
         return { ...process.env, PATH: `${extraPaths.join(pathDelimiter)}${pathDelimiter}${process.env.PATH}` };
     }
     ```
-  - [ ] Keep the rest of `shell.js` unchanged (the exported functions, no signature changes).
+  - [x] Keep the rest of `shell.js` unchanged (the exported functions, no signature changes).
 
-- [ ] **Task 2: Update `shell.test.js`** (AC: #5, #7)
-  - [ ] Identify the existing test(s) that assert `PATH` contents. They currently expect the three Mac paths to be present.
-  - [ ] Add a top-of-file `vi.mock("node:os", ...)` setup that lets each test stub `platform()` per-case. Or use `vi.spyOn(os, "platform").mockReturnValue(...)` inside each test.
-  - [ ] Three new test cases:
+- [x] **Task 2: Update `shell.test.js`** (AC: #5, #7)
+  - [x] Identify the existing test(s) that assert `PATH` contents. They currently expect the three Mac paths to be present.
+  - [x] Add a top-of-file `vi.mock("node:os", ...)` setup that lets each test stub `platform()` per-case. Or use `vi.spyOn(os, "platform").mockReturnValue(...)` inside each test.
+  - [x] Three new test cases:
     1. `buildEnv() on darwin prepends ~/.rd/bin, /opt/homebrew/bin, /usr/local/bin in that order separated by path.delimiter`
     2. `buildEnv() on linux prepends only /usr/local/bin`
     3. `buildEnv() on win32 returns process.env unchanged (no extra paths)`
-  - [ ] The existing tests that exercise `run()`, `captureCommand()`, `spawnInteractive()` etc. via stubbing `execSync`/`spawn` — verify they still pass without modification. (`buildEnv()` is internal; those tests probably don't care about its internals beyond "env is set".)
+  - [x] The existing tests that exercise `run()`, `captureCommand()`, `spawnInteractive()` etc. via stubbing `execSync`/`spawn` — verify they still pass without modification. (`buildEnv()` is internal; those tests probably don't care about its internals beyond "env is set".)
 
-- [ ] **Task 3: Verify scope and run tests** (AC: #6, #7)
-  - [ ] `git status` — confirm ONLY `src/lib/shell.js` and `src/lib/shell.test.js` are modified.
-  - [ ] `npm test` — confirm all 370+ tests pass (the count will go up by 2-3 from the new platform tests).
+- [x] **Task 3: Verify scope and run tests** (AC: #6, #7)
+  - [x] `git status` — confirm ONLY `src/lib/shell.js` and `src/lib/shell.test.js` are modified.
+  - [x] `npm test` — confirm all 370+ tests pass (the count will go up by 2-3 from the new platform tests).
 
 ## Dev Notes
 
@@ -116,11 +116,11 @@ src/lib/
 
 ### Definition of Done
 
-- [ ] `buildEnv()` branches on `os.platform()` with darwin / linux / fallback cases.
-- [ ] Path delimiter sourced from `node:path.delimiter`, not hard-coded `:`.
-- [ ] `shell.test.js` has 3 new platform test cases AND all existing tests still pass.
-- [ ] `npm test` reports all green.
-- [ ] No file outside `src/lib/shell.js` and its test is modified.
+- [x] `buildEnv()` branches on `os.platform()` with darwin / linux / fallback cases.
+- [x] Path delimiter sourced from `node:path.delimiter`, not hard-coded `:`.
+- [x] `shell.test.js` has 3 new platform test cases AND all existing tests still pass.
+- [x] `npm test` reports all green.
+- [x] No file outside `src/lib/shell.js` and its test is modified.
 
 ### References
 

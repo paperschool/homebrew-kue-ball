@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.0.7 — 2026-05-27
+
+- `src/lib/shell.js` `buildEnv()` is now platform-aware via `os.platform()` and `path.delimiter` (Story 7-3). On `darwin` it still prepends `~/.rd/bin` + `/opt/homebrew/bin` + `/usr/local/bin` (unchanged). On `linux` (incl. WSL2 Ubuntu) it prepends only `/usr/local/bin` — no dead Mac paths. On `win32` it returns `process.env` unchanged. Self-contained refactor; +3 tests (376 total).
+
 ## v2.0.6 — 2026-05-27
 
 - Fixed the **actual** cause of `npm run docker:start` failing with `/bin/sh: no such file or directory`: the kubelogin install step was unzipping from WORKDIR `/`, so the archive's top-level `bin/linux_<arch>/` directory landed under `/bin/`. The subsequent `rm -rf bin/` then wiped `/bin` entirely (including `/bin/sh`), breaking every later RUN. Moved the extraction to `/tmp` so relative paths resolve safely. The previous v2.0.5 platform-flag removal was a non-fix (correct platform handling, but not the root bug).

@@ -1,13 +1,33 @@
 import { execSync, spawn, spawnSync } from "child_process";
+import { platform } from "node:os";
+import { delimiter as pathDelimiter } from "node:path";
 import { warn } from "./output.js";
 
+// Platform-aware PATH augmentation. On Mac we shim in the usual Homebrew /
+// Rancher Desktop locations because those binaries are NOT on the default GUI-
+// inherited PATH; on Linux (including WSL2 Ubuntu) only /usr/local/bin matters;
+// on Windows (out-of-scope per NFR8) we leave PATH untouched rather than poison
+// it with POSIX paths. The separator is `path.delimiter` (`:` on POSIX, `;` on
+// Windows) so a future native-Windows branch wouldn't need to re-find it.
 function buildEnv() {
-    const extraPaths = [
-        `${process.env.HOME}/.rd/bin`,
-        "/opt/homebrew/bin",
-        "/usr/local/bin",
-    ].join(":");
-    return { ...process.env, PATH: `${extraPaths}:${process.env.PATH}` };
+    const plat = platform();
+    let extraPaths;
+    if (plat === "darwin") {
+        extraPaths = [
+            `${process.env.HOME}/.rd/bin`,
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+        ];
+    } else if (plat === "linux") {
+        extraPaths = ["/usr/local/bin"];
+    } else {
+        // win32 (or anything else) — don't prepend anything; PATH stays as-is.
+        return { ...process.env };
+    }
+    return {
+        ...process.env,
+        PATH: `${extraPaths.join(pathDelimiter)}${pathDelimiter}${process.env.PATH ?? ""}`,
+    };
 }
 
 export function run(cmd, { silent = false } = {}) {

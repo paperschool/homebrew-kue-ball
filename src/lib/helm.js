@@ -9,11 +9,9 @@ export function getHelmVersion() {
     return raw ? raw.replace(/\+g[a-f0-9]+$/, "") : null;
 }
 
-export function listHelmReleases(ctx, ns) {
-    const raw = run(
-        `helm list --namespace ${ns} --kube-context ${ctx} -o json`,
-        { silent: true }
-    );
+export function listHelmReleases(ctx, ns, extraFlags = []) {
+    const flags = ["--namespace", ns, "--kube-context", ctx, "-o", "json", ...extraFlags].join(" ");
+    const raw = run(`helm list ${flags}`, { silent: true });
     try {
         return JSON.parse(raw ?? "[]");
     } catch {

@@ -8,10 +8,10 @@ import {
 } from "./runner.js";
 import { run } from "./shell.js";
 import { pickResourceInstance } from "./universalVerbs.js";
-import { isPermissionError } from "./azure.js";
+import { isPermissionError, isNetworkError } from "./azure.js";
 import { ok, warn, info } from "./output.js";
 import { APP_NAME } from "./env.js";
-import { waitForKeypress, showAuthErrorPage } from "../ui/chrome.js";
+import { waitForKeypress, showAuthErrorPage, showNetworkErrorPage } from "../ui/chrome.js";
 import { select, input, confirm } from "@inquirer/prompts";
 
 // For a Job, the actual logs live on the Pod that the Job spawned. Resolve it via the job-name selector.
@@ -154,6 +154,10 @@ export const SPECIFIC_VERBS = {
                 { interactive: true, onStderr: (s) => { capturedStderr = s; } },
             );
             if (code === 0) return;
+            if (isNetworkError(capturedStderr)) {
+                await showNetworkErrorPage(capturedStderr);
+                return;
+            }
             if (isPermissionError(capturedStderr)) {
                 await showAuthErrorPage(capturedStderr);
                 return;

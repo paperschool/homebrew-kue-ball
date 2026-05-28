@@ -11,7 +11,7 @@ import { APP_NAME, DEFAULT_NAMESPACE, DEFAULT_CONTEXT } from "./lib/env.js";
 import { refreshContexts, isPermissionError, showPimReminder, subscriptionForContext, isAzCliAvailable, getAzVersion } from "./lib/azure.js";
 import { RETURN_TO_MENU, runLive } from "./lib/runner.js";
 import { searchableList, BACK_SIGNAL } from "./ui/searchableList.js";
-import { initChrome, loadIdentity, setAuthStatus, drawSplash, hideSplash, setContextInfo, setLastCommand, setSubscription, step, destroyChrome } from "./ui/chrome.js";
+import { initChrome, loadIdentity, setAuthStatus, drawSplash, hideSplash, setContextInfo, setLastCommand, setSubscription, step, destroyChrome, confirmExit } from "./ui/chrome.js";
 import { startAuthPoller, stopAuthPoller } from "./ui/authPoller.js";
 import { confirm, input } from "@inquirer/prompts";
 
@@ -183,19 +183,24 @@ async function checkPrerequisites() {
     return { azAvailable: az.found };
 }
 
+// Returned by runLegacySubmenu when the user picks Back so the outer loop knows to
+// exit the submenu. Distinct from `null` / `undefined`, which an action handler may
+// return when it ran but produced no sentinel — those should stay on the submenu.
+const BACK_TO_MAIN = Symbol("back-to-main");
+
 async function runLegacySubmenu(label, builder, ctx, ns) {
     step(label, "Pick an operation to run.");
     const commands = builder(ctx, ns);
     if (commands.length === 0) {
         warn(`No ${label.toLowerCase()} commands available.`);
-        return null;
+        return BACK_TO_MAIN;
     }
     const items = [
         ...commands.map((cmd) => ({ name: styleDeleteCommandLabel(cmd.name), value: cmd, group: cmd.group })),
         { name: `${DIM}← Back${RESET}`, value: { back: true } },
     ];
-    const picked = await searchableList({ message: `${label} action:`, items, enableBack: true });
-    if (!picked || picked === BACK_SIGNAL || picked.back) return null;
+    const picked = await withExitConfirm(() => searchableList({ message: `${label} action:`, items, enableBack: true }));
+    if (!picked || picked === BACK_SIGNAL || picked.back) return BACK_TO_MAIN;
     setLastCommand(picked.name);
     return picked.run();
 }
@@ -231,6 +236,26 @@ async function handleSentinel(result, context, currentNamespace) {
     return { context, currentNamespace };
 }
 
+// Runs an inquirer-backed prompt; if the user hits Ctrl+C, intercepts the resulting
+// ExitPromptError and shows the exit-confirm page. Returns the prompt result on
+// success, retries the prompt on cancel, and never returns on confirm (we exit).
+async function withExitConfirm(promptFn) {
+    while (true) {
+        try {
+            return await promptFn();
+        } catch (err) {
+            if (err?.name !== "ExitPromptError") throw err;
+            const confirmed = await confirmExit();
+            if (confirmed) {
+                destroyChrome();
+                console.log(`\n  ${DIM}Goodbye!${RESET}\n`);
+                process.exit(0);
+            }
+            // user cancelled — re-show the same prompt
+        }
+    }
+}
+
 async function main() {
     initChrome();
     await loadIdentity();
@@ -251,31 +276,47 @@ async function main() {
         const doRefresh = await confirm({ message: "Refresh contexts now?", default: false, clearPromptOnDone: true });
         if (doRefresh) await refreshContexts();
     }
-    let context = await pickContext();
+    let context = await withExitConfirm(() => pickContext());
     if (!context) return;
-    let currentNamespace = await pickNamespace(context);
+    let currentNamespace = await withExitConfirm(() => pickNamespace(context));
     setContextInfo(context, currentNamespace);
     setSubscription(subscriptionForContext(context));
     hideSplash();
 
     while (true) {
         step("Choose resource", "Pick a kubernetes resource type to act on.");
-        const top = await searchableList({ message: "Resource or action:", items: buildResourceMenu() });
+        const top = await withExitConfirm(() => searchableList({ message: "Resource or action:", items: buildResourceMenu() }));
         if (!top || (top.type === "extra" && top.id === "exit")) break;
 
         if (top.type === "extra") {
-            let extraResult = null;
-            try {
-                if (top.id === "helm")     extraResult = await runLegacySubmenu("Helm",     buildHelmCommands,     context, currentNamespace);
-                if (top.id === "ping")     extraResult = await runLegacySubmenu("Ping",     buildPingCommands,     context, currentNamespace);
-                if (top.id === "events")   extraResult = await runLegacySubmenu("Events",   buildEventsExtras,     context, currentNamespace);
-                if (top.id === "contexts") extraResult = await runLegacySubmenu("Context / Namespace", buildContextsExtras, context, currentNamespace);
-            } catch (err) {
-                console.error(`\n  ${RED}✗ ${err.message}${RESET}`);
-                if (isPermissionError(err.message)) showPimReminder();
-                continue;
+            // Loop within the extras submenu so it mirrors the resource-verb flow:
+            // after each action completes, redraw the same submenu rather than
+            // bouncing back to the top-level resource picker. The user explicitly
+            // picks Back (BACK_TO_MAIN) to exit.
+            let stayInExtra = true;
+            while (stayInExtra) {
+                let extraResult = null;
+                try {
+                    // runLegacySubmenu's own picker is wrapped so Ctrl+C inside the submenu
+                    // picker re-shows the submenu. Ctrl+C inside the picked action's prompts
+                    // bubbles up here and is handled below (step back to the submenu picker).
+                    if (top.id === "helm")     extraResult = await runLegacySubmenu("Helm",     buildHelmCommands,     context, currentNamespace);
+                    if (top.id === "ping")     extraResult = await runLegacySubmenu("Ping",     buildPingCommands,     context, currentNamespace);
+                    if (top.id === "events")   extraResult = await runLegacySubmenu("Events",   buildEventsExtras,     context, currentNamespace);
+                    if (top.id === "contexts") extraResult = await runLegacySubmenu("Context / Namespace", buildContextsExtras, context, currentNamespace);
+                } catch (err) {
+                    if (err?.name === "ExitPromptError") {
+                        const confirmed = await confirmExit();
+                        if (confirmed) { destroyChrome(); console.log(`\n  ${DIM}Goodbye!${RESET}\n`); process.exit(0); }
+                        continue; // user cancelled — back to the submenu picker
+                    }
+                    console.error(`\n  ${RED}✗ ${err.message}${RESET}`);
+                    if (isPermissionError(err.message)) showPimReminder();
+                    continue;
+                }
+                if (extraResult === BACK_TO_MAIN) { stayInExtra = false; break; }
+                ({ context, currentNamespace } = await handleSentinel(extraResult, context, currentNamespace));
             }
-            ({ context, currentNamespace } = await handleSentinel(extraResult, context, currentNamespace));
             continue;
         }
 
@@ -284,7 +325,7 @@ async function main() {
         while (stayOnResource) {
             step(`${resource.displayName} — choose action`, "Pick an operation to run.");
             // No `message` — the step() title above ("X — choose action") already names the operation.
-            const picked = await searchableList({ message: "", items: buildVerbMenu(resource), enableBack: true });
+            const picked = await withExitConfirm(() => searchableList({ message: "", items: buildVerbMenu(resource), enableBack: true }));
             if (!picked || picked === BACK_SIGNAL || picked.back) { stayOnResource = false; break; }
             setLastCommand(`${resource.displayName}: ${picked.verb}`);
             try {
@@ -292,6 +333,11 @@ async function main() {
                 if (result === RETURN_TO_MENU) continue;
                 ({ context, currentNamespace } = await handleSentinel(result, context, currentNamespace));
             } catch (err) {
+                if (err?.name === "ExitPromptError") {
+                    const confirmed = await confirmExit();
+                    if (confirmed) { destroyChrome(); console.log(`\n  ${DIM}Goodbye!${RESET}\n`); process.exit(0); }
+                    continue; // user cancelled — back to the verb picker
+                }
                 console.error(`\n  ${RED}✗ ${err.message}${RESET}`);
                 if (isPermissionError(err.message)) showPimReminder();
             }

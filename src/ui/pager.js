@@ -1,8 +1,9 @@
-import { getContentStart, getContentRows, isActive as chromeActive, onResize as onChromeResize } from "./chrome.js";
+import { getContentStart, getContentRows, isActive as chromeActive, onResize as onChromeResize, confirmExit, destroyChrome } from "./chrome.js";
 import { DIM, RESET, BOLD, CYAN } from "../lib/output.js";
 
-// Keys that dismiss the pager (in normal mode): q, Esc (lone), Enter, Ctrl-C.
-const QUIT_KEYS = new Set(["q", "\x1b", "\r", "\x03"]);
+// Keys that dismiss the pager (in normal mode): q, Esc (lone), Enter. Ctrl-C is
+// handled separately so it routes to the exit-confirm page rather than just dismissing.
+const QUIT_KEYS = new Set(["q", "\x1b", "\r"]);
 
 export function isQuitKey(key) {
     return QUIT_KEYS.has(key);
@@ -140,12 +141,26 @@ export function pageOutput(text, { onEdit } = {}) {
             resolve();
         };
 
-        const onData = (buf) => {
+        const onData = async (buf) => {
             const key = buf.toString("utf8");
+            if (key === "\x03") {
+                // Ctrl-C: defer to the global exit-confirm. Detach our stdin listener
+                // while confirmExit owns the terminal; reattach + redraw if the user
+                // cancels so the pager keeps working as if nothing happened.
+                process.stdin.off("data", onData);
+                if (!wasRaw && process.stdin.setRawMode) process.stdin.setRawMode(false);
+                const confirmed = await confirmExit();
+                if (confirmed) { destroyChrome(); process.exit(0); }
+                if (process.stdin.setRawMode) process.stdin.setRawMode(true);
+                process.stdin.resume();
+                process.stdin.on("data", onData);
+                w("\x1b[?7l"); // re-disable line wrap (confirmExit's cleanup may have stomped it)
+                render();
+                return;
+            }
             if (mode === "filter") {
                 if (key === "\r") mode = "normal";                              // apply, keep filter
                 else if (key === "\x1b") { query = ""; refilter(); mode = "normal"; } // cancel filter
-                else if (key === "\x03") { cleanup(); return; }                 // Ctrl-C quits
                 else if (key === "\x7f" || key === "\b") { query = query.slice(0, -1); refilter(); }
                 else if (key.length === 1 && key >= " ") { query += key; refilter(); }
                 else return; // ignore arrows etc. while typing

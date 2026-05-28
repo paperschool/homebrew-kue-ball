@@ -1,5 +1,5 @@
 import { run } from "../lib/shell.js";
-import { BOLD, CYAN, DIM, RESET, YELLOW, stripAnsi } from "../lib/output.js";
+import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW, stripAnsi } from "../lib/output.js";
 
 const TITLE = "kue-ball";
 
@@ -21,8 +21,12 @@ const RESIZE_DEBOUNCE_MS = 80; // coalesce the burst of resize events fired duri
 
 // ── Chrome colour palette ────────────────────────────────────────────────────
 const C_BAR_BG = "\x1b[48;5;24m";           // bars bg: dark steel blue (#005f87)
+const C_BAR_BG_WARNING = "\x1b[48;5;94m";   // bars bg: dark amber — auth/permission warning
+const C_BAR_BG_ERROR = "\x1b[48;5;88m";     // bars bg: dark red — network/connectivity error
 const C_APP = "\x1b[1;97m";              // app name: bold bright white
 const C_SEP = "\x1b[0;48;5;24;38;5;75m"; // separator ·: reset + reapply bg + sky blue
+const C_SEP_WARNING = "\x1b[0;48;5;94;38;5;231m"; // separator on warning bg: white
+const C_SEP_ERROR = "\x1b[0;48;5;88;38;5;231m";   // separator on error bg: white
 const C_CTX = "\x1b[38;5;81m";           // context name: light cyan
 const C_NS = "\x1b[38;5;117m";          // namespace: light periwinkle
 const C_BAR_TEXT = "\x1b[38;5;252m";          // status bar text: near-white
@@ -75,6 +79,10 @@ let _splashAnimAngle = Math.PI / 4; // start at the static-look diagonal (top-le
 const SPLASH_ANIM_INTERVAL_MS = 80;
 const SPLASH_ANIM_ANGULAR_VELOCITY = (2 * Math.PI) / (8000 / SPLASH_ANIM_INTERVAL_MS); // full revolution per 8s
 let _stepHeaderRows = 0; // rows consumed by the active step()'s title block; lets prompts pin below it
+// Alert state. null = normal blue bars; "warning" = yellow/amber (auth page); "error" = red
+// (network page). Driven by showAuthErrorPage / showNetworkErrorPage so the chrome echoes the
+// severity of whatever's filling the content area. Reverted to null on dismissal.
+let _alertLevel = null;
 const _resizeSubscribers = new Set();
 
 function cols() { return process.stdout.columns ?? 80; }
@@ -106,23 +114,37 @@ function _commandLines() {
 // actual command wraps onto more lines.
 function _contentStart() { return CONTENT_BASE + _commandLines().length; }
 
+function _activeBarBg() {
+    if (_alertLevel === "error") return C_BAR_BG_ERROR;
+    if (_alertLevel === "warning") return C_BAR_BG_WARNING;
+    return C_BAR_BG;
+}
+
+function _activeSep() {
+    if (_alertLevel === "error") return C_SEP_ERROR;
+    if (_alertLevel === "warning") return C_SEP_WARNING;
+    return C_SEP;
+}
+
 function drawTitle() {
     const width = cols();
     const dot = " \u00b7 ";
     const appPlain = ` ${TITLE}`;
-    let bar = C_BAR_BG + C_APP + appPlain;
+    const barBg = _activeBarBg();
+    const sep = _activeSep();
+    let bar = barBg + C_APP + appPlain;
     let barLen = appPlain.length;
     if (ctxName) {
-        bar += C_SEP + dot + C_LABEL + "ctx:" + C_CTX + " " + ctxName;
+        bar += sep + dot + C_LABEL + "ctx:" + C_CTX + " " + ctxName;
         barLen += dot.length + 5 + ctxName.length; // "ctx:" + space
         if (nsName) {
-            bar += C_SEP + dot + C_LABEL + "ns:" + C_NS + " " + nsName;
+            bar += sep + dot + C_LABEL + "ns:" + C_NS + " " + nsName;
             barLen += dot.length + 4 + nsName.length; // "ns:" + space
         }
     }
     // Fill to right edge with bg
     const pad = Math.max(0, width - barLen - 1);
-    bar += C_BAR_BG + " ".repeat(pad) + " " + C_RESET;
+    bar += barBg + " ".repeat(pad) + " " + C_RESET;
     moveTo(1, 1);
     w("\x1b[2K" + bar);
 }
@@ -194,11 +216,15 @@ function _progressBar(width) {
     return bar + "\x1b[39m"; // reset foreground only — keep the bar background
 }
 
-// Right-side auth glyph: an animated spinner while confirming, then a coloured lock.
+// Right-side auth glyph: an animated spinner while confirming, then a coloured status dot.
+// Why a dot and not 🔒: U+1F512 is a UTF-16 surrogate pair (JS .length === 2) but renders as
+// either 1 or 2 columns depending on the terminal — making lockPlain.length an unreliable proxy
+// for visible width in the status-bar math. ● (U+25CF) is single-cell across every monospace
+// terminal, so visible width === code-unit count holds at any cols(), at any resize.
 function _authGlyph() {
     if (_authStatus === "checking") return `\x1b[33m${AUTH_SPINNER[_authSpinnerTick % AUTH_SPINNER.length]}\x1b[0m`;
-    if (_authStatus === "ok") return "\x1b[32m🔒\x1b[0m";
-    if (_authStatus === "error") return "\x1b[31m🔒\x1b[0m";
+    if (_authStatus === "ok") return "\x1b[32m●\x1b[0m";
+    if (_authStatus === "error") return "\x1b[31m●\x1b[0m";
     return "";
 }
 
@@ -215,7 +241,7 @@ function _renderStatusBar(bracket = true) {
         : " ".repeat(available);
     const segments = [{ text: C_BAR_TEXT + left + middle + lockRaw + C_RESET }];
     if (bracket) w("\x1b[s");
-    _writeStatusBar(segments, C_BAR_BG);
+    _writeStatusBar(segments, _activeBarBg());
     if (bracket) w("\x1b[u");
 }
 
@@ -322,7 +348,7 @@ export function initChrome() {
     _drawSearchBar();
     _drawLastCmdDivider();
     moveTo(rows(), 1);
-    w(C_BAR_BG + "\x1b[2K" + C_RESET);
+    w(_activeBarBg() + "\x1b[2K" + C_RESET);
     setScrollRegion();
     moveTo(_contentStart(), 1);
     _sigintHandler = () => { destroyChrome(); process.exit(0); };
@@ -360,7 +386,7 @@ export function resumeChromeAfterStreaming() {
     _drawSearchBar();
     _drawLastCmdDivider();
     moveTo(rows(), 1);
-    w(C_BAR_BG + "\x1b[2K" + C_RESET);
+    w(_activeBarBg() + "\x1b[2K" + C_RESET);
     _renderStatusBar();
     setScrollRegion();
     moveTo(_contentStart(), 1);
@@ -384,6 +410,7 @@ export function destroyChrome() {
     if (_splashAnimTimer) { clearInterval(_splashAnimTimer); _splashAnimTimer = null; }
     _splashVisible = false;
     _progressActive = false;
+    _alertLevel = null;
     if (_resizeTimer) { clearTimeout(_resizeTimer); _resizeTimer = null; }
     _resizeSubscribers.clear();
     process.stdout.off("resize", _onResize);
@@ -421,6 +448,19 @@ export function setSubscription(sub) {
     subscription = truncate(sub, 20);
     _composeIdentity();
     _renderStatusBar();
+}
+
+// Set the chrome bars' alert tint: null (default blue), "warning" (amber), or "error" (red).
+// Called by showAuthErrorPage / showNetworkErrorPage to echo the page severity in the
+// surrounding chrome, and reverted to null when those pages dismiss. Safe to call when
+// the chrome isn't active — state is held for the next draw, but no immediate paint occurs.
+export function setAlertLevel(level) {
+    _alertLevel = level === "warning" || level === "error" ? level : null;
+    if (!active) return;
+    w("\x1b[s");
+    drawTitle();
+    _renderStatusBar(false);
+    w("\x1b[u");
 }
 
 export function setAuthStatus(status) {
@@ -616,7 +656,22 @@ export async function waitForKeypress() {
             process.stdin.pause();
             resolve();
         };
-        const onData = () => cleanup();
+        const onData = (buf) => {
+            const key = buf.toString("utf8");
+            if (key === "\x03") {
+                // Yield stdin to confirmExit, then either exit or fall back to the
+                // any-key dismiss this helper exists for.
+                process.stdin.off("data", onData);
+                if (!wasRaw && process.stdin.setRawMode) process.stdin.setRawMode(false);
+                process.stdin.pause();
+                confirmExit().then((confirmed) => {
+                    if (confirmed) { destroyChrome(); process.exit(0); }
+                    resolve(); // user cancelled — treat as a normal dismiss
+                });
+                return;
+            }
+            cleanup();
+        };
         if (!wasRaw && process.stdin.setRawMode) process.stdin.setRawMode(true);
         process.stdin.resume();
         process.stdin.on("data", onData);
@@ -675,12 +730,8 @@ export async function showAuthErrorPage(errorOutput) {
     // Pause any splash animation so the warning page isn't redrawn over.
     const wasSplashVisible = _splashVisible;
     _splashVisible = false;
+    setAlertLevel("warning");
 
-    clearContent();
-
-    const top = _contentStart();
-    const bottom = rows() - 1;
-    const contentHeight = bottom - top + 1;
     const snippet = _pullAuthErrorSnippet(errorOutput);
     const wrapWidth = Math.max(40, Math.min(cols() - 8, 72));
     const wrappedSnippet = _wrap(snippet, wrapWidth);
@@ -698,33 +749,263 @@ export async function showAuthErrorPage(errorOutput) {
     const header = "Authentication / Permission Error";
     const dismiss = "Press any key to return.";
 
-    const blockHeight = warningArt.length + 1 /*gap*/ + 1 /*header*/ + 1 /*gap*/ + wrappedSnippet.length + 1 /*gap*/ + wrappedQuestion.length + 1 /*gap*/ + 1 /*dismiss*/;
-    const startRow = top + Math.max(1, Math.floor((contentHeight - blockHeight) / 2));
+    const render = () => {
+        clearContent();
+        const top = _contentStart();
+        const bottom = rows() - 1;
+        const contentHeight = bottom - top + 1;
+        const blockHeight = warningArt.length + 1 /*gap*/ + 1 /*header*/ + 1 /*gap*/ + wrappedSnippet.length + 1 /*gap*/ + wrappedQuestion.length + 1 /*gap*/ + 1 /*dismiss*/;
+        const startRow = top + Math.max(1, Math.floor((contentHeight - blockHeight) / 2));
+        let r = startRow;
+        for (const line of warningArt) _centreLine(r++, line, `${BOLD}${YELLOW}`);
+        r++;
+        _centreLine(r++, header, `${BOLD}${YELLOW}`);
+        r++;
+        for (const line of wrappedSnippet) _centreLine(r++, line, DIM);
+        r++;
+        for (const line of wrappedQuestion) _centreLine(r++, line, YELLOW);
+        r++;
+        _centreLine(r++, dismiss, DIM);
+    };
 
-    let r = startRow;
-    for (const line of warningArt) _centreLine(r++, line, `${BOLD}${YELLOW}`);
-    r++;
-    _centreLine(r++, header, `${BOLD}${YELLOW}`);
-    r++;
-    for (const line of wrappedSnippet) _centreLine(r++, line, DIM);
-    r++;
-    for (const line of wrappedQuestion) _centreLine(r++, line, YELLOW);
-    r++;
-    _centreLine(r++, dismiss, DIM);
+    render();
 
-    // Wait for any keypress, then clean up.
+    // Wait for any keypress, then clean up. Ctrl+C routes to the exit-confirm page
+    // and either exits the app or returns us here (re-rendered, listener re-attached).
     return new Promise((resolve) => {
         const wasRaw = process.stdin.isRaw === true;
-        const onData = () => cleanup();
-        const cleanup = () => {
+        const detach = () => {
             process.stdin.off("data", onData);
             if (!wasRaw && process.stdin.setRawMode) process.stdin.setRawMode(false);
             process.stdin.pause();
+        };
+        const attach = () => {
+            if (!wasRaw && process.stdin.setRawMode) process.stdin.setRawMode(true);
+            process.stdin.resume();
+            process.stdin.on("data", onData);
+        };
+        const cleanup = () => {
+            detach();
+            setAlertLevel(null);
             clearContent();
             // Restore splash animation only if it was running before — verb output normally
             // means we're past the splash phase, so this is just defensive.
             if (wasSplashVisible) { _splashVisible = true; _drawSplashArt(); }
             resolve();
+        };
+        const onData = async (buf) => {
+            const key = buf.toString("utf8");
+            if (key === "\x03") {
+                detach();
+                const confirmed = await confirmExit();
+                if (confirmed) { destroyChrome(); process.exit(0); }
+                // User cancelled — confirmExit already restored the warning tint; redraw
+                // our page (its content was cleared) and re-attach our key listener.
+                render();
+                attach();
+                return;
+            }
+            cleanup();
+        };
+        attach();
+    });
+}
+
+// ── Network / connectivity error page ──────────────────────────────────────
+// Same shape as showAuthErrorPage but red, with an X-cross art and a connectivity
+// prompt — so a DNS / dial-tcp / VPN failure doesn't get presented as a PIM/auth
+// issue (which sends the user chasing the wrong fix).
+
+function _pullNetworkErrorSnippet(output) {
+    const lines = stripAnsi(output ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+    return lines.find((l) => /no such host|dial tcp|cluster unreachable|connection refused|no route to host|network is unreachable|i\/o timeout|unable to resolve|eai_again|enotfound|econnrefused|etimedout|getaddrinfo/i.test(l))
+        ?? lines[0]
+        ?? "Network error (no output).";
+}
+
+export async function showNetworkErrorPage(errorOutput) {
+    if (!active) return;
+    const wasSplashVisible = _splashVisible;
+    _splashVisible = false;
+    setAlertLevel("error");
+
+    const snippet = _pullNetworkErrorSnippet(errorOutput);
+    const wrapWidth = Math.max(40, Math.min(cols() - 8, 72));
+    const wrappedSnippet = _wrap(snippet, wrapWidth);
+    const question = "Are you connected to the network / VPN required to reach this cluster?";
+    const wrappedQuestion = _wrap(question, wrapWidth);
+
+    // X-cross built from independently centred rows — mirrors the warning triangle's
+    // approach so it sits in the same visual slot but unambiguously says "error", not
+    // "warning". Backslashes are doubled because they're inside a JS string.
+    const errorArt = [
+        "█\\   /█",
+        " \\\\ //",
+        " // \\\\",
+        "█/   \\█",
+    ];
+    const header = "Network / Connectivity Error";
+    const dismiss = "Press any key to return.";
+
+    const render = () => {
+        clearContent();
+        const top = _contentStart();
+        const bottom = rows() - 1;
+        const contentHeight = bottom - top + 1;
+        const blockHeight = errorArt.length + 1 /*gap*/ + 1 /*header*/ + 1 /*gap*/ + wrappedSnippet.length + 1 /*gap*/ + wrappedQuestion.length + 1 /*gap*/ + 1 /*dismiss*/;
+        const startRow = top + Math.max(1, Math.floor((contentHeight - blockHeight) / 2));
+        let r = startRow;
+        for (const line of errorArt) _centreLine(r++, line, `${BOLD}${RED}`);
+        r++;
+        _centreLine(r++, header, `${BOLD}${RED}`);
+        r++;
+        for (const line of wrappedSnippet) _centreLine(r++, line, DIM);
+        r++;
+        for (const line of wrappedQuestion) _centreLine(r++, line, RED);
+        r++;
+        _centreLine(r++, dismiss, DIM);
+    };
+
+    render();
+
+    return new Promise((resolve) => {
+        const wasRaw = process.stdin.isRaw === true;
+        const detach = () => {
+            process.stdin.off("data", onData);
+            if (!wasRaw && process.stdin.setRawMode) process.stdin.setRawMode(false);
+            process.stdin.pause();
+        };
+        const attach = () => {
+            if (!wasRaw && process.stdin.setRawMode) process.stdin.setRawMode(true);
+            process.stdin.resume();
+            process.stdin.on("data", onData);
+        };
+        const cleanup = () => {
+            detach();
+            setAlertLevel(null);
+            clearContent();
+            if (wasSplashVisible) { _splashVisible = true; _drawSplashArt(); }
+            resolve();
+        };
+        const onData = async (buf) => {
+            const key = buf.toString("utf8");
+            if (key === "\x03") {
+                detach();
+                const confirmed = await confirmExit();
+                if (confirmed) { destroyChrome(); process.exit(0); }
+                // confirmExit restored our error tint; redraw and re-attach.
+                render();
+                attach();
+                return;
+            }
+            cleanup();
+        };
+        attach();
+    });
+}
+
+// ── Exit confirmation page ────────────────────────────────────────────────
+// Shown when the user presses Ctrl+C from any raw-mode dispatcher (pager, error
+// pages, waitForKeypress, menu prompts). Resolves true if the user confirms exit
+// (Enter or a second Ctrl+C), false to return to the previous screen (Esc, ←,
+// Backspace). Callers are responsible for restoring stdin / redrawing their own
+// content if the user cancels.
+
+export async function confirmExit() {
+    if (!active) return true; // no chrome to confirm against — caller should just exit
+    const wasSplashVisible = _splashVisible;
+    _splashVisible = false;
+    // Neutralize the chrome bars while the confirm is up — an alert-tinted bar
+    // (from sitting on top of the auth/network page when Ctrl+C was hit) would
+    // visually compete with the confirm. Restored on resolve.
+    const previousAlert = _alertLevel;
+    setAlertLevel(null);
+
+    clearContent();
+
+    const top = _contentStart();
+    const bottom = rows() - 1;
+    const contentHeight = bottom - top + 1;
+
+    // 45×11 pictogram: silhouette of a figure stepping through a doorway, drawn with
+    // `@` (frame/figure) and `.` (negative space). Each row is centred independently
+    // by _centreLine — every row is the same width so they align as one image. Width
+    // is fixed at 45 chars; on terminals narrower than that the pad clamps to 0 and
+    // the art still renders without wrapping.
+    const exitArt = [
+        "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@",
+        "@@@@.............@@@@@@@@@@@@@@@@@@@@@@@@@@@@",
+        "@@@@.......@@@...@@@@@@@@@@@@@@....@@@@@@@@@@",
+        "@@@@...@@@@@@....@@@@@@@@@@@@@@@@....@@@@@@@@",
+        "@@@@.@@@.@@@@@@..@@@@@@@@@@@@@@@@@.....@@@@@@",
+        "@@@@@@@.@@@@..@@@@@@@@@@@@...............@@@@",
+        "@@@@....@@@@.....@@@@@@@@@@@@@@@@@......@@@@@",
+        "@@@@...@@@.@@....@@@@@@@@@@@@@@@@.....@@@@@@@",
+        "@@@@@@@@@...@@...@@@@@@@@@@@@@@.....@@@@@@@@@",
+        "@@@@.........@@..@@@@@@@@@@@@@@@@@@@@@@@@@@@@",
+        "@@@@........@@@.@@@@@@@@@@@@@@@@@@@@@@@@@@@@@",
+    ];
+    const header = "Exit kue-ball?";
+    const note = "Any in-flight kubectl / helm operations are not affected — only the wizard exits.";
+    const wrapWidth = Math.max(40, Math.min(cols() - 8, 72));
+    const wrappedNote = _wrap(note, wrapWidth);
+    const hint = `${BOLD}Enter${RESET}${DIM} to exit  ·  ${BOLD}${RESET}${DIM}Esc / Backspace / ← to return${RESET}`;
+
+    // Drop the note on tight terminals so the 11-row art + header + hint still fit
+    // within the content area without colliding with the status bar. The art / header
+    // / hint together are 15 rows; the note adds wrappedNote.length + 2 more.
+    const baseBlockHeight = exitArt.length + 1 /*gap*/ + 1 /*header*/ + 1 /*gap*/ + 1 /*hint*/;
+    const noteBlockHeight = wrappedNote.length + 1 /*gap before note*/;
+    const showNote = contentHeight >= baseBlockHeight + noteBlockHeight + 1;
+    const blockHeight = baseBlockHeight + (showNote ? noteBlockHeight : 0);
+    const startRow = top + Math.max(0, Math.floor((contentHeight - blockHeight) / 2));
+
+    // Per-character coloring so the pictogram reads like an emergency-exit sign:
+    // the `@` frame/backdrop is green, the `.` figure/highlights are bright white.
+    // _centreLine strips ANSI for its length math, so the pre-coloured string still
+    // pads correctly to 45 visible cells regardless of how many escapes are in it.
+    const BRIGHT_WHITE = "\x1b[97m";
+    const colorize = (line) => {
+        let out = "";
+        for (const ch of line) {
+            if (ch === "@") out += `${BOLD}${GREEN}@`;
+            else if (ch === ".") out += `${BOLD}${BRIGHT_WHITE}.`;
+            else out += ch;
+        }
+        return out + RESET;
+    };
+
+    let r = startRow;
+    for (const line of exitArt) _centreLine(r++, colorize(line), "");
+    r++;
+    _centreLine(r++, header, `${BOLD}${GREEN}`);
+    if (showNote) {
+        r++;
+        for (const line of wrappedNote) _centreLine(r++, line, DIM);
+    }
+    r++;
+    _centreLine(r++, hint, "");
+
+    return new Promise((resolve) => {
+        const wasRaw = process.stdin.isRaw === true;
+        const cleanup = (confirmed) => {
+            process.stdin.off("data", onData);
+            if (!wasRaw && process.stdin.setRawMode) process.stdin.setRawMode(false);
+            process.stdin.pause();
+            clearContent();
+            // Restore the caller's alert tint (warning / error / null) only on cancel —
+            // on confirm the caller is about to exit so it doesn't matter.
+            if (!confirmed) setAlertLevel(previousAlert);
+            if (wasSplashVisible) { _splashVisible = true; _drawSplashArt(); }
+            resolve(confirmed);
+        };
+        const onData = (buf) => {
+            const key = buf.toString("utf8");
+            if (key === "\r" || key === "\n") return cleanup(true);
+            // Esc (bare), Backspace (DEL/BS), Left arrow → cancel
+            if (key === "\x1b" || key === "\x7f" || key === "\b" || key === "\x1b[D") return cleanup(false);
+            // Second Ctrl+C confirms immediately (well-established CLI convention)
+            if (key === "\x03") return cleanup(true);
         };
         if (!wasRaw && process.stdin.setRawMode) process.stdin.setRawMode(true);
         process.stdin.resume();

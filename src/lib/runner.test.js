@@ -19,12 +19,14 @@ vi.mock("../ui/chrome.js", () => ({
     stopProgress: vi.fn(),
     setLastCommandRun: vi.fn(),
     showAuthErrorPage: vi.fn().mockResolvedValue(undefined),
+    showNetworkErrorPage: vi.fn().mockResolvedValue(undefined),
     suspendChromeForStreaming: vi.fn(),
     resumeChromeAfterStreaming: vi.fn(),
 }));
 
 vi.mock("./azure.js", () => ({
     isPermissionError: vi.fn().mockReturnValue(false),
+    isNetworkError: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock("../ui/pager.js", () => ({
@@ -33,8 +35,8 @@ vi.mock("../ui/pager.js", () => ({
 
 import * as shell from "./shell.js";
 import * as chrome from "../ui/chrome.js";
-import { isPermissionError } from "./azure.js";
-import { showAuthErrorPage } from "../ui/chrome.js";
+import { isPermissionError, isNetworkError } from "./azure.js";
+import { showAuthErrorPage, showNetworkErrorPage } from "../ui/chrome.js";
 import { pageOutput } from "../ui/pager.js";
 import {
     isJqAvailable,
@@ -118,6 +120,38 @@ describe("runLive()", () => {
 
         expect(showAuthErrorPage).not.toHaveBeenCalled();
         expect(pageOutput).toHaveBeenCalled();
+    });
+
+    it("routes to the network-error page (not pager / auth) when exit is non-zero and output looks like a connectivity failure", async () => {
+        shell.captureCommand.mockResolvedValue({
+            code: 1,
+            output: 'Error: kubernetes cluster unreachable: Get "https://x.azmk8s.io:443/version": dial tcp: lookup x.azmk8s.io: no such host',
+        });
+        isNetworkError.mockReturnValueOnce(true);
+
+        const code = await runLive("kubectl", ["get", "pods"]);
+
+        expect(showNetworkErrorPage).toHaveBeenCalledWith(expect.stringContaining("no such host"));
+        expect(showAuthErrorPage).not.toHaveBeenCalled();
+        expect(pageOutput).not.toHaveBeenCalled();
+        expect(code).toBe(1);
+    });
+
+    it("prefers the network-error page over the auth-error page when both classifiers match", async () => {
+        // Real-world case: kubelogin can't reach login.microsoftonline.com — output mentions
+        // both "failed to get token" (could read as auth) and "no such host" (network). The
+        // root cause is network, so we route there to avoid sending users to the PIM checklist.
+        shell.captureCommand.mockResolvedValue({
+            code: 1,
+            output: "Error: failed to get token: unable to resolve an endpoint: dial tcp: lookup login.microsoftonline.com: no such host",
+        });
+        isNetworkError.mockReturnValueOnce(true);
+        isPermissionError.mockReturnValueOnce(true);
+
+        await runLive("kubectl", ["get", "pods"]);
+
+        expect(showNetworkErrorPage).toHaveBeenCalledOnce();
+        expect(showAuthErrorPage).not.toHaveBeenCalled();
     });
 
     it("records the actual command in the chrome header", async () => {

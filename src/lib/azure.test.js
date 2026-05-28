@@ -41,6 +41,7 @@ import { loadPrefs } from "./prefs.js";
 import {
     isAzCliAvailable,
     isPermissionError,
+    isNetworkError,
     showPimReminder,
     listSubscriptions,
     listAksClustersForSub,
@@ -101,6 +102,33 @@ describe("isPermissionError()", () => {
     it("handles null/undefined gracefully", () => {
         expect(isPermissionError(null)).toBe(false);
         expect(isPermissionError(undefined)).toBe(false);
+    });
+});
+
+describe("isNetworkError()", () => {
+    it("returns true for the real kubelogin DNS-failure output", () => {
+        const msg = `Error: failed to get token: unable to resolve an endpoint: server response error:
+ Get "https://login.microsoftonline.com/.../v2.0/.well-known/openid-configuration?": dial tcp: lookup login.microsoftonline.com: no such host
+Error: kubernetes cluster unreachable: Get "https://x.azmk8s.io:443/version": getting credentials: exec: executable kubelogin failed with exit code 1`;
+        expect(isNetworkError(msg)).toBe(true);
+    });
+
+    it("returns true for the assorted connectivity markers", () => {
+        expect(isNetworkError("dial tcp: connect: connection refused")).toBe(true);
+        expect(isNetworkError("Get https://x: i/o timeout")).toBe(true);
+        expect(isNetworkError("network is unreachable")).toBe(true);
+        expect(isNetworkError("Error: cluster unreachable")).toBe(true);
+        expect(isNetworkError("getaddrinfo ENOTFOUND example.com")).toBe(true);
+    });
+
+    it("returns false for unrelated error messages", () => {
+        expect(isNetworkError("forbidden: insufficient role")).toBe(false);
+        expect(isNetworkError("resource not found")).toBe(false);
+    });
+
+    it("handles null/undefined gracefully", () => {
+        expect(isNetworkError(null)).toBe(false);
+        expect(isNetworkError(undefined)).toBe(false);
     });
 });
 

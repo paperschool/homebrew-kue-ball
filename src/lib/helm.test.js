@@ -35,6 +35,13 @@ describe("listHelmReleases()", () => {
         expect(cmd).toContain("-o json");
     });
 
+    it("appends extra filter flags when provided (e.g. --pending, --failed)", () => {
+        shell.run.mockReturnValue("[]");
+        listHelmReleases("my-ctx", "my-ns", ["--pending"]);
+        const [cmd] = shell.run.mock.calls[0];
+        expect(cmd).toContain("--pending");
+    });
+
     it("returns parsed array of release objects on valid JSON", () => {
         const releases = [
             { name: "my-release", namespace: "my-ns", status: "deployed" },

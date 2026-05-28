@@ -254,33 +254,130 @@ describe("chrome", () => {
 
     // ── setAuthStatus ────────────────────────────────────────────────────────
 
+    describe("confirmExit()", () => {
+        it("resolves true immediately when chrome isn't active (caller falls through to exit)", async () => {
+            // Without an initChrome, there's no UI to confirm against. Returning true
+            // lets the caller skip the page render and exit straight away — used by
+            // boot-time prompts (pickContext etc.) that fire before initChrome runs.
+            const result = await chrome.confirmExit();
+            expect(result).toBe(true);
+        });
+    });
+
+    describe("status-bar width invariant", () => {
+        // Status-bar math reserves right-side space by JS code-unit count (lockPlain.length).
+        // For that to match what the terminal actually shows, every right-side glyph MUST be
+        // single-cell. ● (U+25CF) is 1 cell in every monospace terminal — 🔒 was a surrogate
+        // pair that some terminals rendered at 1 col and others at 2, breaking the math. This
+        // test stops the wide-glyph regression from coming back: visible right-side width
+        // (after stripping ANSI) must equal the code-unit length the math relies on.
+        function visibleRightSide(authStatus) {
+            chrome.initChrome();
+            // composeIdentity is internal; setSubscription triggers a redraw so identitySegment
+            // (and therefore status-bar maths) reflect a realistic state.
+            chrome.setSubscription("sub-x");
+            chrome.setAuthStatus(authStatus);
+            writeSpy.mockClear();
+            chrome.setAuthStatus(authStatus); // force a clean status-bar render to capture
+            const written = allWritten();
+            // Find the status-bar segment text by stripping ANSI; right-side glyph (or two
+            // spaces when none) sits at the end of the bar between two single-space pads.
+            const stripped = written.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
+            return stripped;
+        }
+
+        it("only emits single-cell glyphs on the right side (no surrogate pairs)", () => {
+            for (const status of ["ok", "error"]) {
+                const stripped = visibleRightSide(status);
+                // No code point above U+FFFF — anything outside the BMP is a surrogate pair
+                // in JS, whose .length (2) almost never matches its display width.
+                for (const ch of stripped) {
+                    expect(ch.codePointAt(0)).toBeLessThanOrEqual(0xFFFF);
+                }
+            }
+        });
+    });
+
+    describe("setAlertLevel()", () => {
+        // Asserts on the raw bg escape codes from chrome.js — kept in sync so a palette
+        // change is forced to update both. Default = dark steel blue, warning = dark amber,
+        // error = dark red.
+        const BG_DEFAULT = "\x1b[48;5;24m";
+        const BG_WARNING = "\x1b[48;5;94m";
+        const BG_ERROR = "\x1b[48;5;88m";
+
+        it("tints the title and status bar amber for 'warning'", () => {
+            chrome.initChrome();
+            writeSpy.mockClear();
+            chrome.setAlertLevel("warning");
+            const written = allWritten();
+            expect(written).toContain(BG_WARNING);
+            expect(written).not.toContain(BG_DEFAULT);
+        });
+
+        it("tints the title and status bar red for 'error'", () => {
+            chrome.initChrome();
+            writeSpy.mockClear();
+            chrome.setAlertLevel("error");
+            const written = allWritten();
+            expect(written).toContain(BG_ERROR);
+            expect(written).not.toContain(BG_DEFAULT);
+        });
+
+        it("reverts to default blue when set back to null", () => {
+            chrome.initChrome();
+            chrome.setAlertLevel("error");
+            writeSpy.mockClear();
+            chrome.setAlertLevel(null);
+            const written = allWritten();
+            expect(written).toContain(BG_DEFAULT);
+            expect(written).not.toContain(BG_ERROR);
+        });
+
+        it("ignores unknown levels and treats them as default", () => {
+            chrome.initChrome();
+            chrome.setAlertLevel("error");
+            writeSpy.mockClear();
+            chrome.setAlertLevel("nonsense");
+            const written = allWritten();
+            expect(written).toContain(BG_DEFAULT);
+            expect(written).not.toContain(BG_ERROR);
+        });
+
+        it("is a no-op when the chrome isn't active (does not throw or write)", () => {
+            writeSpy.mockClear();
+            expect(() => chrome.setAlertLevel("warning")).not.toThrow();
+            expect(writeSpy).not.toHaveBeenCalled();
+        });
+    });
+
     describe("setAuthStatus()", () => {
-        it("renders green lock for 'ok'", () => {
+        it("renders green status dot for 'ok'", () => {
             chrome.initChrome();
             writeSpy.mockClear();
             chrome.setAuthStatus("ok");
             const written = allWritten();
             expect(written).toContain("\x1b[32m");
-            expect(written).toContain("🔒");
+            expect(written).toContain("●");
         });
 
-        it("renders red lock for 'error'", () => {
+        it("renders red status dot for 'error'", () => {
             chrome.initChrome();
             writeSpy.mockClear();
             chrome.setAuthStatus("error");
             const written = allWritten();
             expect(written).toContain("\x1b[31m");
-            expect(written).toContain("🔒");
+            expect(written).toContain("●");
         });
 
-        it("renders an animated spinner (not the lock) for 'checking'", () => {
+        it("renders an animated spinner (not the status dot) for 'checking'", () => {
             chrome.initChrome();
             writeSpy.mockClear();
             chrome.setAuthStatus("checking");
             const written = allWritten();
             expect(written).toContain("\x1b[33m");   // spinner colour
             expect(written).toContain("⠋");          // first spinner frame
-            expect(written).not.toContain("🔒");     // no lock while confirming
+            expect(written).not.toContain("●");      // no status dot while confirming
             chrome.setAuthStatus("ok");              // stop the spinner timer
         });
     });

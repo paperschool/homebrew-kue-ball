@@ -5,6 +5,8 @@ vi.mock("./chrome.js", () => ({
     getContentRows: vi.fn(() => 18),
     isActive: vi.fn(() => false),
     onResize: vi.fn(() => () => {}),
+    confirmExit: vi.fn().mockResolvedValue(false),
+    destroyChrome: vi.fn(),
 }));
 
 vi.mock("../lib/output.js", () => ({
@@ -17,10 +19,14 @@ vi.mock("../lib/output.js", () => ({
 import { isQuitKey, scrollFor, hScrollFor, filterLines, pageOutput } from "./pager.js";
 
 describe("isQuitKey()", () => {
-    it("treats q, Esc, Enter and Ctrl-C as quit", () => {
-        for (const key of ["q", "\x1b", "\r", "\x03"]) {
+    it("treats q, Esc, and Enter as quit (Ctrl-C is handled separately via confirmExit)", () => {
+        for (const key of ["q", "\x1b", "\r"]) {
             expect(isQuitKey(key)).toBe(true);
         }
+    });
+
+    it("does not treat Ctrl-C as a normal quit key — it routes to confirmExit instead", () => {
+        expect(isQuitKey("\x03")).toBe(false);
     });
 
     it("does not treat arrow keys or navigation keys as quit", () => {

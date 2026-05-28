@@ -48,6 +48,29 @@ export function isPermissionError(errorMsg) {
     );
 }
 
+// DNS / TCP / VPN-style failures from kubectl, helm, kubelogin, az, etc. Distinct from
+// permission errors because the fix is almost always "connect to the VPN / wait for the
+// network to come back" rather than re-authenticating. Routed to its own red error page
+// in chrome so the user isn't shown a PIM/auth checklist for a connectivity problem.
+export function isNetworkError(errorMsg) {
+    const text = (errorMsg ?? "").toLowerCase();
+    return (
+        text.includes("no such host") ||
+        text.includes("dial tcp") ||
+        text.includes("i/o timeout") ||
+        text.includes("connection refused") ||
+        text.includes("network is unreachable") ||
+        text.includes("no route to host") ||
+        text.includes("cluster unreachable") ||
+        text.includes("unable to resolve") ||
+        text.includes("eai_again") ||
+        text.includes("enotfound") ||
+        text.includes("econnrefused") ||
+        text.includes("etimedout") ||
+        text.includes("getaddrinfo")
+    );
+}
+
 export function showPimReminder() {
     warn("Permission/Authorization Issue Detected");
     info(`If you have elevated roles (e.g., group memberships) through PIM,`);

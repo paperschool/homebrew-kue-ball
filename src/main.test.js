@@ -65,6 +65,7 @@ vi.mock("./ui/chrome.js", () => ({
     initChrome: vi.fn(),
     loadIdentity: vi.fn().mockResolvedValue(undefined),
     destroyChrome: vi.fn(),
+    confirmExit: vi.fn().mockResolvedValue(true),
     getIdentitySegment: vi.fn().mockReturnValue(""),
     isActive: vi.fn().mockReturnValue(false),
     getContentRows: vi.fn().mockReturnValue(18),
